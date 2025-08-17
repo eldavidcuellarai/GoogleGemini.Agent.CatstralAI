@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador de Cartas Catastrales - Gemini Multimodal</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                        <rect x="3" y="4" width="18" height="16" fill="#4285f4" rx="2"/>
+                        <path d="M7 8h10M7 12h6M7 16h8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <h1>Analizador de Cartas Catastrales</h1>
+                </div>
+                <div class="theme-toggle">
+                    <button id="themeToggle" class="btn btn--outline btn--sm">🌙 Tema</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Configuration Section -->
+        <section class="config-section">
+            <div class="config-container">
+                <h2>Configuración</h2>
+                <div class="config-form">
+                    <div class="form-group">
+                        <label for="apiKey" class="form-label">API Key de Gemini</label>
+                        <div class="api-key-input">
+                            <input 
+                                type="password" 
+                                id="apiKey" 
+                                class="form-control" 
+                                placeholder="Ingresa tu API Key de Google AI Studio"
+                                autocomplete="off"
+                            >
+                            <button type="button" id="toggleApiKey" class="btn btn--outline btn--sm">
+                                <span class="show-text">Mostrar</span>
+                                <span class="hide-text hidden">Ocultar</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="systemPrompt" class="form-label">System Prompt</label>
+                        <textarea 
+                            id="systemPrompt" 
+                            class="form-control system-prompt-textarea" 
+                            rows="3"
+                            placeholder="Define cómo debe comportarse el asistente para análisis catastral..."
+                        >Eres un experto analista de documentos catastrales. Analiza detalladamente cartas catastrales, extrae información específica como superficie, ubicación, linderos, valor catastral, y proporciona análisis comparativos cuando se presenten múltiples documentos. Responde siempre en español de manera clara y estructurada.</textarea>
+                    </div>
+                    
+                    <button id="saveConfig" class="btn btn--primary">
+                        Guardar Configuración
+                    </button>
+                    
+                    <div id="configStatus" class="config-status hidden">
+                        <div class="status status--success">
+                            ✓ Configuración guardada correctamente
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- File Upload Section -->
+        <section class="upload-section">
+            <div class="upload-container">
+                <h3>Cargar Documentos Catastrales</h3>
+                
+                <!-- Upload Area -->
+                <div id="uploadArea" class="upload-area">
+                    <div class="upload-content">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                            <polyline points="14.5,2 14.5,7.5 20,7.5"/>
+                        </svg>
+                        <h4>Arrastra archivos aquí o haz clic para seleccionar</h4>
+                        <p>Soporta imágenes (PNG, JPEG, WebP) y PDFs • Máximo 10 archivos • 50MB total</p>
+                        <button type="button" class="btn btn--primary">Seleccionar Archivos</button>
+                    </div>
+                    <input type="file" id="fileInput" multiple accept="image/png,image/jpeg,image/webp,application/pdf" style="display: none;">
+                </div>
+
+                <!-- Processing Mode Selection -->
+                <div class="processing-mode">
+                    <h4>Modo de Procesamiento</h4>
+                    <div class="mode-options">
+                        <label class="mode-option">
+                            <input type="radio" name="processingMode" value="sequential" checked>
+                            <span class="mode-card">
+                                <strong>Análisis Secuencial</strong>
+                                <small>Procesa archivos uno por uno para análisis detallado</small>
+                            </span>
+                        </label>
+                        <label class="mode-option">
+                            <input type="radio" name="processingMode" value="batch">
+                            <span class="mode-card">
+                                <strong>Procesamiento por Lotes</strong>
+                                <small>Analiza todos los archivos simultáneamente para comparación</small>
+                            </span>
+                        </label>
+                        <label class="mode-option">
+                            <input type="radio" name="processingMode" value="selective">
+                            <span class="mode-card">
+                                <strong>Análisis Selectivo</strong>
+                                <small>Permite elegir archivos específicos para procesar</small>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- File Gallery -->
+                <div id="fileGallery" class="file-gallery hidden">
+                    <div class="gallery-header">
+                        <h4>Archivos Cargados (<span id="fileCount">0</span>)</h4>
+                        <div class="gallery-actions">
+                            <button id="selectAllFiles" class="btn btn--outline btn--sm">Seleccionar Todo</button>
+                            <button id="clearAllFiles" class="btn btn--outline btn--sm">Eliminar Todo</button>
+                            <select id="sortFiles" class="form-control">
+                                <option value="name">Ordenar por Nombre</option>
+                                <option value="size">Ordenar por Tamaño</option>
+                                <option value="type">Ordenar por Tipo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="fileList" class="file-list"></div>
+                </div>
+
+                <!-- Quick Analysis Buttons -->
+                <div id="quickAnalysis" class="quick-analysis hidden">
+                    <h4>Análisis Rápido</h4>
+                    <div class="analysis-buttons">
+                        <button class="analysis-btn" data-prompt="compare">
+                            🔍 Comparar Propiedades
+                        </button>
+                        <button class="analysis-btn" data-prompt="extract">
+                            📊 Extraer Datos
+                        </button>
+                        <button class="analysis-btn" data-prompt="surface">
+                            📏 Mayor Superficie
+                        </button>
+                        <button class="analysis-btn" data-prompt="summary">
+                            📋 Resumen Consolidado
+                        </button>
+                        <button class="analysis-btn" data-prompt="inconsistencies">
+                            ⚠️ Detectar Inconsistencias
+                        </button>
+                        <button class="analysis-btn" data-prompt="ranking">
+                            🏆 Ranking por Valor
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chat Section -->
+        <section class="chat-section">
+            <div class="chat-container">
+                <div class="chat-header">
+                    <h3>Análisis de Documentos</h3>
+                    <div class="chat-actions">
+                        <button id="exportResults" class="btn btn--outline btn--sm" disabled>
+                            💾 Exportar
+                        </button>
+                        <button id="clearChat" class="btn btn--outline btn--sm" disabled>
+                            🗑️ Limpiar Chat
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="chatMessages" class="chat-messages">
+                    <div class="welcome-message">
+                        <div class="welcome-icon">📄</div>
+                        <h4>¡Bienvenido al Analizador de Cartas Catastrales!</h4>
+                        <p>1. Configura tu API key</p>
+                        <p>2. Carga tus documentos catastrales (imágenes o PDFs)</p>
+                        <p>3. Selecciona el modo de análisis</p>
+                        <p>4. Comienza a analizar tus propiedades</p>
+                    </div>
+                </div>
+                
+                <div class="chat-input-area">
+                    <!-- Selected files preview -->
+                    <div class="selected-files" id="selectedFiles" style="display: none;">
+                        <div class="selected-header">
+                            <span>Archivos seleccionados para análisis:</span>
+                            <button id="clearSelection" class="btn btn--outline btn--sm">Limpiar Selección</button>
+                        </div>
+                        <div id="selectedFilesList" class="selected-files-list"></div>
+                    </div>
+                    
+                    <!-- Input container -->
+                    <div class="input-container">
+                        <div class="message-input-wrapper">
+                            <textarea 
+                                id="messageInput" 
+                                class="form-control message-input" 
+                                rows="2"
+                                placeholder="Pregunta sobre tus documentos catastrales... (Configura primero tu API key)"
+                                disabled
+                            ></textarea>
+                        </div>
+                        
+                        <div class="input-actions">
+                            <button id="processFiles" class="btn btn--secondary btn--sm" type="button" disabled>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 3v18M3 12h18"/>
+                                </svg>
+                                Procesar
+                            </button>
+                            
+                            <button id="sendMessage" class="btn btn--primary" type="button" disabled>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="22" y1="2" x2="11" y2="13"/>
+                                    <polygon points="22,2 15,22 11,13 2,9 22,2"/>
+                                </svg>
+                                Enviar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="loading-spinner"></div>
+            <p id="loadingText">Procesando documentos...</p>
+            <div id="loadingProgress" class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h3>Exportar Resultados</h3>
+            <div class="export-options">
+                <button class="export-option" data-format="json">
+                    <strong>JSON</strong>
+                    <small>Datos estructurados</small>
+                </button>
+                <button class="export-option" data-format="csv">
+                    <strong>CSV</strong>
+                    <small>Tabla comparativa</small>
+                </button>
+                <button class="export-option" data-format="summary">
+                    <strong>Resumen Ejecutivo</strong>
+                    <small>Texto consolidado</small>
+                </button>
+            </div>
+            <div class="modal-actions">
+                <button id="closeExportModal" class="btn btn--outline">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
