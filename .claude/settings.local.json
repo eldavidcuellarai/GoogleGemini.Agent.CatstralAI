@@ -5,7 +5,10 @@
       "Bash(git config:*)",
       "Bash(git add:*)",
       "Bash(git push:*)",
-      "Bash(git remote set-url:*)"
+      "Bash(git remote set-url:*)",
+      "Bash(start \"C:\\Users\\cuell\\OneDrive\\Escritorio\\Catastro Gemini\\GoogleGemini.Agent.CatstralAI\\el cerebro de gemini\\index.html\")",
+      "Bash(pnpm dev:*)",
+      "Bash(pnpm add:*)"
     ],
     "defaultMode": "acceptEdits"
   }
