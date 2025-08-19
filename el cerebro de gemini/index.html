@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analizador de Cartas Catastrales - Gemini Multimodal</title>
+    <title>Analizador de Cartas Catastrales - CloudRun AI</title>
+    <meta name="description" content="Herramienta de análisis inteligente de documentos catastrales usando AI">
+    <meta name="theme-color" content="#4285f4">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='3' y='4' width='18' height='16' fill='%234285f4' rx='2'/><path d='M7 8h10M7 12h6M7 16h8' stroke='white' stroke-width='1.5' stroke-linecap='round'/></svg>">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
@@ -17,10 +20,18 @@
                         <rect x="3" y="4" width="18" height="16" fill="#4285f4" rx="2"/>
                         <path d="M7 8h10M7 12h6M7 16h8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
                     </svg>
-                    <h1>Analizador de Cartas Catastrales</h1>
+                    <h1>CloudRun AI Catastral</h1>
+                    <span class="header-subtitle">Análisis inteligente de documentos</span>
                 </div>
-                <div class="theme-toggle">
-                    <button id="themeToggle" class="btn btn--outline btn--sm">🌙 Tema</button>
+                <div class="header-controls">
+                    <div class="connection-status" id="connectionStatus">
+                        <span class="status-indicator offline"></span>
+                        <span class="status-text">Sin configurar</span>
+                    </div>
+                    <button id="themeToggle" class="btn btn--outline btn--sm">
+                        <span class="theme-icon">🌙</span>
+                        <span class="theme-text">Tema</span>
+                    </button>
                 </div>
             </div>
         </header>
@@ -30,15 +41,27 @@
             <div class="config-container">
                 <h2>Configuración</h2>
                 <div class="config-form">
+                    <div class="config-header">
+                        <div class="config-icon">⚙️</div>
+                        <div>
+                            <p class="config-description">Configura tu API Key de Google AI Studio para comenzar</p>
+                            <a href="https://makersuite.google.com/app/apikey" target="_blank" class="config-link">Obtener API Key →</a>
+                        </div>
+                    </div>
                     <div class="form-group">
-                        <label for="apiKey" class="form-label">API Key de Gemini</label>
+                        <label for="apiKey" class="form-label">
+                            <span>API Key de Gemini</span>
+                            <span class="label-required">*</span>
+                        </label>
                         <div class="api-key-input">
                             <input 
                                 type="password" 
                                 id="apiKey" 
                                 class="form-control" 
-                                placeholder="Ingresa tu API Key de Google AI Studio"
+                                placeholder="AIzaSy..."
                                 autocomplete="off"
+                                maxlength="39"
+                                pattern="AIza[0-9A-Za-z_-]{35}"
                             >
                             <button type="button" id="toggleApiKey" class="btn btn--outline btn--sm">
                                 <span class="show-text">Mostrar</span>
@@ -48,13 +71,17 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="systemPrompt" class="form-label">System Prompt</label>
+                        <label for="systemPrompt" class="form-label">
+                            <span>Instrucciones del Sistema</span>
+                            <span class="label-optional">opcional</span>
+                        </label>
                         <textarea 
                             id="systemPrompt" 
                             class="form-control system-prompt-textarea" 
-                            rows="3"
-                            placeholder="Define cómo debe comportarse el asistente para análisis catastral..."
-                        >Eres un experto analista de documentos catastrales. Analiza detalladamente cartas catastrales, extrae información específica como superficie, ubicación, linderos, valor catastral, y proporciona análisis comparativos cuando se presenten múltiples documentos. Responde siempre en español de manera clara y estructurada.</textarea>
+                            rows="4"
+                            placeholder="Personaliza cómo debe comportarse el asistente..."
+                        >Eres un experto analista de documentos catastrales especializado en el análisis técnico y legal de propiedades. Analiza detalladamente cartas catastrales, extrae información específica como superficie, ubicación, linderos, valor catastral, coordenadas, y proporciona análisis comparativos cuando se presenten múltiples documentos. Identifica posibles inconsistencias y brinda recomendaciones. Responde en español de manera clara, estructurada y profesional.</textarea>
+                        <div class="form-hint">💡 El prompt predeterminado está optimizado para análisis catastral</div>
                     </div>
                     
                     <button id="saveConfig" class="btn btn--primary">
@@ -78,20 +105,56 @@
                 <!-- Upload Area -->
                 <div id="uploadArea" class="upload-area">
                     <div class="upload-content">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-                            <polyline points="14.5,2 14.5,7.5 20,7.5"/>
-                        </svg>
-                        <h4>Arrastra archivos aquí o haz clic para seleccionar</h4>
-                        <p>Soporta imágenes (PNG, JPEG, WebP) y PDFs • Máximo 10 archivos • 50MB total</p>
-                        <button type="button" class="btn btn--primary">Seleccionar Archivos</button>
+                        <div class="upload-animation">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                                <polyline points="14.5,2 14.5,7.5 20,7.5"/>
+                            </svg>
+                            <div class="upload-particles">
+                                <div class="particle"></div>
+                                <div class="particle"></div>
+                                <div class="particle"></div>
+                            </div>
+                        </div>
+                        <h4>Arrastra documentos aquí o haz clic para seleccionar</h4>
+                        <div class="upload-specs">
+                            <div class="spec-item">
+                                <span class="spec-icon">📄</span>
+                                <span>PDF, PNG, JPEG, WebP</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-icon">📊</span>
+                                <span>Hasta 10 archivos</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-icon">💾</span>
+                                <span>Máx. 50MB total</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn--primary btn--upload">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7,10 12,15 17,10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Seleccionar Archivos
+                        </button>
                     </div>
                     <input type="file" id="fileInput" multiple accept="image/png,image/jpeg,image/webp,application/pdf" style="display: none;">
                 </div>
 
                 <!-- Processing Mode Selection -->
                 <div class="processing-mode">
-                    <h4>Modo de Procesamiento</h4>
+                    <div class="section-header">
+                        <h4>Modo de Procesamiento</h4>
+                        <div class="section-help" data-tooltip="Selecciona cómo quieres procesar los documentos">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M9,9h0a3,3,0,0,1,6,0c0,2-3,3-3,3"/>
+                                <path d="m12,17h0"/>
+                            </svg>
+                        </div>
+                    </div>
                     <div class="mode-options">
                         <label class="mode-option">
                             <input type="radio" name="processingMode" value="sequential" checked>
