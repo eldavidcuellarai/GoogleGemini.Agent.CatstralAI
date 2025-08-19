@@ -1,0 +1,33 @@
+{
+  "name": "catastral-analyzer",
+  "version": "1.0.0",
+  "description": "Catastral property registry analyzer using Google Gemini AI",
+  "main": "index.js",
+  "scripts": {
+    "dev": "cd v0-registro-de-la-propiedad && pnpm dev",
+    "build": "cd v0-registro-de-la-propiedad && pnpm build",
+    "start": "cd v0-registro-de-la-propiedad && pnpm start",
+    "lint": "cd v0-registro-de-la-propiedad && pnpm lint",
+    "install-deps": "cd v0-registro-de-la-propiedad && pnpm install",
+    "vercel-build": "cd v0-registro-de-la-propiedad && pnpm install && pnpm build"
+  },
+  "keywords": [
+    "catastral",
+    "property",
+    "analyzer",
+    "gemini",
+    "ai",
+    "nextjs",
+    "typescript"
+  ],
+  "author": "CloudRun AI",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-username/catastral-analyzer.git"
+  }
+}

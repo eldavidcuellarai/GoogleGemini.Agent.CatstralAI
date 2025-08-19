@@ -1,0 +1,50 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "cd v0-registro-de-la-propiedad && npm run build",
+  "outputDirectory": "v0-registro-de-la-propiedad/.next",
+  "installCommand": "cd v0-registro-de-la-propiedad && npm install",
+  "functions": {
+    "v0-registro-de-la-propiedad/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods", 
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/cerebro",
+      "destination": "/el%20cerebro%20de%20gemini/index.html",
+      "permanent": false
+    }
+  ]
+}

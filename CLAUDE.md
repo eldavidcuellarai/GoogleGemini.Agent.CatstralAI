@@ -5,6 +5,8 @@ This is a catastral property registry analyzer using Google Gemini AI. The proje
 1. A simple HTML/JS interface (`el cerebro de gemini/`)
 2. A Next.js application for PDF property document processing (`v0-registro-de-la-propiedad/`)
 
+**Note**: The v0-registro-de-la-propiedad directory is now integrated as a regular folder (no longer a git submodule).
+
 ## Project Structure
 - **Main directory**: Contains basic HTML interface and this project's core files
 - **v0-registro-de-la-propiedad/**: Next.js application for property registry document processing
@@ -12,6 +14,7 @@ This is a catastral property registry analyzer using Google Gemini AI. The proje
   - Uses Tailwind CSS for styling with Radix UI components
   - PDF processing with pdfjs-dist
   - AI integration using @ai-sdk packages
+  - Fully integrated into main project (no submodule)
 
 ## Development Commands
 When working on the Next.js application (v0-registro-de-la-propiedad/):
@@ -34,6 +37,13 @@ When working on the Next.js application (v0-registro-de-la-propiedad/):
 - The project handles PDF document analysis for property registry documents
 - AI integration is set up for document text extraction and analysis
 - Follow existing TypeScript and React patterns when making changes
+- The project is now optimized for Vercel deployment with proper configuration files
+
+## Deployment
+- **Vercel**: Ready for deployment with vercel.json configuration
+- **Environment Variables**: Set GEMINI_API_KEY in Vercel dashboard
+- **Build Command**: Automatically handled by vercel.json
+- **Framework**: Auto-detected as Next.js
 
 ## Testing
 - Run `pnpm lint` to check code quality

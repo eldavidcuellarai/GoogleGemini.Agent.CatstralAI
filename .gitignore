@@ -144,6 +144,44 @@ ENV/
 env.bak/
 venv.bak/
 
+# Node.js Dependencies
+node_modules/
+v0-registro-de-la-propiedad/node_modules/
+
+# Next.js
+v0-registro-de-la-propiedad/.next/
+v0-registro-de-la-propiedad/out/
+v0-registro-de-la-propiedad/.vercel/
+
+# Next.js Environment variables
+v0-registro-de-la-propiedad/.env*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+*.tgz
+
+# ESLint cache
+.eslintcache
+
 # Spyder project settings
 .spyderproject
 .spyproject
