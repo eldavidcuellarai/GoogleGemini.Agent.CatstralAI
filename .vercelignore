@@ -1,0 +1,7 @@
+el cerebro de gemini/
+*.md
+.git/
+.gitignore
+.env
+.vscode/
+*.log

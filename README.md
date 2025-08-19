@@ -40,13 +40,27 @@ git clone https://github.com/eldavidcuellarai/GoogleGemini.Agent.CatstralAI.git
 2. Instala las dependencias
 ```bash
 cd v0-registro-de-la-propiedad
-pnpm install
+npm install
 ```
 
 3. Inicia el servidor de desarrollo
 ```bash
-pnpm dev
+npm run dev
 ```
+
+## 🚀 Despliegue en Vercel
+
+Para desplegar en Vercel:
+
+1. **Root Directory**: Configura como `v0-registro-de-la-propiedad`
+2. **Framework**: Next.js (auto-detectado)
+3. **Build Command**: `npm run build`
+4. **Install Command**: `npm install`
+5. **Variables de Entorno**: Agrega `GEMINI_API_KEY` con tu API key de Google AI Studio
+
+### Configuración de Variables de Entorno
+
+- `GEMINI_API_KEY` - Tu API key de Google AI Studio
 
 ## 📄 Licencia
 
