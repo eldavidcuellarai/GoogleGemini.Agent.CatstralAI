@@ -5,48 +5,85 @@ Un agente inteligente basado en Google Gemini AI para el procesamiento y anális
 ## 🚀 Características
 
 - Procesamiento inteligente de documentos PDF catastrales
-- Interfaz web moderna construida con Next.js
-- Extracción automática de datos relevantes
-- Visualización y edición de datos procesados
-- Sistema de carga y gestión de archivos
-- Interfaz de usuario responsiva y accesible
+- Interfaz web moderna con análisis en tiempo real
+- Extracción automática de datos relevantes con OCR + IA
+- Visualización y gestión de datos de propiedades
+- Sistema de carga y gestión de archivos drag & drop
+- Interfaz responsiva con tabs organizados por categorías
+- Análisis comparativo de múltiples documentos catastrales
 
 ## 💻 Tecnologías
 
-- **Frontend**: Next.js, TypeScript, Tailwind CSS
+- **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
 - **IA**: Google Gemini AI
-- **Procesamiento de PDFs**: Biblioteca PDF integrada
-- **Componentes UI**: Sistema de diseño personalizado
+- **Procesamiento de PDFs**: PDF.js
+- **Deployment**: Vercel con Node.js Express
+- **UI/UX**: Diseño moderno con sistema de tabs y paneles
 
 ## 🛠️ Estructura del Proyecto
 
 ```
-v0-registro-de-la-propiedad/   # Aplicación principal
-├── app/                       # Lógica principal de Next.js
-│   ├── actions/              # Acciones del servidor
-│   └── api/                  # Endpoints de la API
-├── components/               # Componentes reutilizables
-├── lib/                     # Utilidades y configuración
-└── public/                  # Archivos estáticos
+el cerebro de gemini/          # Aplicación principal (HTML)
+├── index.html                 # Interfaz principal
+├── app.js                     # Lógica de la aplicación
+├── style.css                  # Estilos CSS
+└── README.md                  # Documentación
+
+server.js                      # Servidor Express para producción
+package.json                   # Dependencias y scripts
+vercel.json                    # Configuración de Vercel
 ```
 
 ## 🏁 Comenzando
+
+### Desarrollo Local
 
 1. Clona el repositorio
 ```bash
 git clone https://github.com/eldavidcuellarai/GoogleGemini.Agent.CatstralAI.git
 ```
 
-2. Instala las dependencias
+2. Abre el archivo HTML directamente
 ```bash
-cd v0-registro-de-la-propiedad
+# Opción 1: Abrir directamente en el navegador
+open "el cerebro de gemini/index.html"
+
+# Opción 2: Usar servidor local
+cd GoogleGemini.Agent.CatstralAI
+npm install
+npm run dev
+```
+
+### Despliegue en Vercel
+
+1. Instala las dependencias
+```bash
 npm install
 ```
 
-3. Inicia el servidor de desarrollo
+2. Despliega en Vercel
 ```bash
-npm run dev
+vercel --prod
 ```
+
+## 📱 Interfaz de Usuario
+
+La aplicación incluye:
+
+- **OCR + IA Tab**: Procesamiento principal de documentos catastrales
+  - Carga de documentos de propiedad
+  - Extracción automática de datos
+  - Visualización en tablas organizadas
+- **Validación Tab**: Análisis de documentos de gravamen
+- **Sistema de tabs dual**: Navegación principal y paneles internos (Tablas/Chat)
+- **Datos estructurados**: Información del predio, medidas y colindancias
+
+## 🔧 Configuración
+
+1. Obtén una API Key de Google AI Studio: https://makersuite.google.com/app/apikey
+2. Ingresa tu API Key en la sección de configuración
+3. Personaliza las instrucciones del sistema (opcional)
+4. ¡Comienza a cargar y analizar documentos catastrales!
 
 ## 🚀 Despliegue en Vercel
 

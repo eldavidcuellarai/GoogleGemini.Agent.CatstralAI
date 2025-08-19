@@ -24,6 +24,7 @@ class CatastralAnalyzer {
         this.bindEvents();
         this.loadConfiguration();
         this.setupPDFJS();
+        this.initializeTabs();
     }
     
     initializeElements() {
@@ -1031,9 +1032,52 @@ class CatastralAnalyzer {
         element.style.height = 'auto';
         element.style.height = Math.min(element.scrollHeight, 150) + 'px';
     }
+    
+    // Tab functionality for analysis section
+    initializeTabs() {
+        // Main navigation tabs
+        const navTabs = document.querySelectorAll('.nav-tab');
+        const tabPanels = document.querySelectorAll('.tab-panel');
+        
+        navTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.getAttribute('data-tab');
+                
+                // Remove active class from all tabs and panels
+                navTabs.forEach(t => t.classList.remove('active'));
+                tabPanels.forEach(p => p.classList.remove('active'));
+                
+                // Add active class to clicked tab and corresponding panel
+                tab.classList.add('active');
+                document.getElementById(targetTab + 'Tab').classList.add('active');
+            });
+        });
+        
+        // Panel tabs (Tables/Chat)
+        const panelTabs = document.querySelectorAll('.panel-tab');
+        const dataPanels = document.querySelectorAll('.data-panel');
+        
+        panelTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetPanel = tab.getAttribute('data-panel');
+                
+                // Remove active class from all panel tabs and panels
+                panelTabs.forEach(t => t.classList.remove('active'));
+                dataPanels.forEach(p => p.classList.remove('active'));
+                
+                // Add active class to clicked tab and corresponding panel
+                tab.classList.add('active');
+                document.getElementById(targetPanel + 'Panel').classList.add('active');
+            });
+        });
+    }
 }
 
 // Initialize the analyzer when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.analyzer = new CatastralAnalyzer();
+    // Initialize tabs after analyzer is created
+    if (window.analyzer && typeof window.analyzer.initializeTabs === 'function') {
+        window.analyzer.initializeTabs();
+    }
 });

@@ -224,31 +224,188 @@
             </div>
         </section>
 
-        <!-- Chat Section -->
+        <!-- Main Analysis Section -->
+        <section class="analysis-section">
+            <div class="analysis-container">
+                <!-- Navigation Tabs -->
+                <div class="analysis-nav">
+                    <div class="nav-tabs">
+                        <button class="nav-tab active" data-tab="ocr">OCR + IA</button>
+                        <button class="nav-tab" data-tab="validation">Validación</button>
+                    </div>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- OCR + IA Tab -->
+                    <div id="ocrTab" class="tab-panel active">
+                        <div class="panel-split">
+                            <!-- Left Panel - Document Upload -->
+                            <div class="panel-left">
+                                <div class="panel-header">
+                                    <h3>Documentos de Propiedad</h3>
+                                </div>
+                                
+                                <!-- Upload Section -->
+                                <div class="upload-section-compact">
+                                    <h4>Carga de Documentos de Propiedad</h4>
+                                    <div class="upload-area-compact" id="uploadAreaCompact">
+                                        <div class="upload-content-compact">
+                                            <div class="upload-icon">📁</div>
+                                            <p>Arrastra y suelta tus documentos aquí</p>
+                                            <p class="upload-hint">o</p>
+                                            <button type="button" class="btn btn--primary btn--sm">
+                                                Seleccionar Archivos
+                                            </button>
+                                        </div>
+                                        <div class="upload-specs-compact">
+                                            <small>Formatos soportados: PDF con texto. Tamaño máximo: 30 MB.</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Uploaded Files List -->
+                                <div class="uploaded-files-section">
+                                    <h4>Archivos Subidos (Propiedad)</h4>
+                                    <div class="file-item" id="sampleFile">
+                                        <div class="file-info">
+                                            <div class="file-icon">📄</div>
+                                            <div class="file-details">
+                                                <div class="file-name">17-0001554739-0001-01-0135-0012-00-00277-2023-01-17-00 (1).pdf</div>
+                                                <div class="file-size">27.13 MB</div>
+                                            </div>
+                                        </div>
+                                        <div class="file-status">
+                                            <div class="status-indicator completed"></div>
+                                            <span class="status-text">Completado</span>
+                                        </div>
+                                        <div class="file-progress">
+                                            <div class="progress-bar-full"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right Panel - Extracted Data -->
+                            <div class="panel-right">
+                                <div class="panel-header">
+                                    <h3>Datos Extraídos (Propiedad)</h3>
+                                    <div class="panel-tabs">
+                                        <button class="panel-tab active" data-panel="tables">Tablas</button>
+                                        <button class="panel-tab" data-panel="chat">Chat</button>
+                                    </div>
+                                </div>
+
+                                <!-- Tables Panel -->
+                                <div id="tablesPanel" class="data-panel active">
+                                    <!-- Property Information Card -->
+                                    <div class="data-card">
+                                        <div class="card-header">
+                                            <div class="card-icon">🏠</div>
+                                            <h4>Información del Predio</h4>
+                                        </div>
+                                        <div class="card-content">
+                                            <div class="data-row">
+                                                <span class="data-label">Expediente Catastral:</span>
+                                                <span class="data-value">67-269-007</span>
+                                            </div>
+                                            <div class="data-row">
+                                                <span class="data-label">Lote:</span>
+                                                <span class="data-value">07</span>
+                                            </div>
+                                            <div class="data-row">
+                                                <span class="data-label">Manzana:</span>
+                                                <span class="data-value">269</span>
+                                            </div>
+                                            <div class="data-row">
+                                                <span class="data-label">Superficie:</span>
+                                                <span class="data-value">99.692 m²</span>
+                                            </div>
+                                            <div class="data-row">
+                                                <span class="data-label">Colonia:</span>
+                                                <span class="data-value">MIRADOR DE APODACA</span>
+                                            </div>
+                                            <div class="data-row">
+                                                <span class="data-label">Municipio:</span>
+                                                <span class="data-value">APODACA</span>
+                                            </div>
+                                            <div class="data-row">
+                                                <span class="data-label">Código Postal:</span>
+                                                <span class="data-value">NO_CONSTA</span>
+                                            </div>
+                                            <div class="data-row">
+                                                <span class="data-label">Tipo Predio:</span>
+                                                <span class="data-value">TERRENO</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Measurements and Boundaries Card -->
+                                    <div class="data-card">
+                                        <div class="card-header">
+                                            <div class="card-icon">�</div>
+                                            <h4>Medidas y Colindancias</h4>
+                                        </div>
+                                        <div class="card-content">
+                                            <div class="data-row">
+                                                <span class="data-label">Norte:</span>
+                                                <span class="data-value">6.01 M (seis metros un centímetro) a colindar con CERRO DE LA SILLA</span>
+                                            </div>
+                                            <div class="data-row">
+                                                <span class="data-label">Sur:</span>
+                                                <span class="data-value">6.90 M (seis metros ochenta centímetros) a dar frente a la calle PICO ANETO</span>
+                                            </div>
+                                            <div class="data-row">
+                                                <span class="data-label">Este:</span>
+                                                <span class="data-value">15.70 M (quince metros setenta y nueve centímetros) a colindar con el lote 08 (ocho)</span>
+                                            </div>
+                                            <div class="data-row">
+                                                <span class="data-label">Oeste:</span>
+                                                <span class="data-value">15.70 M (quince metros setenta centímetros) a colindar con el lote 06 (seis)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Chat Panel -->
+                                <div id="chatPanel" class="data-panel">
+                                    <div id="chatMessages" class="chat-messages">
+                                        <div class="welcome-message">
+                                            <div class="welcome-icon">📄</div>
+                                            <h4>¡Bienvenido al Analizador de Cartas Catastrales!</h4>
+                                            <p>1. Configura tu API key</p>
+                                            <p>2. Carga tus documentos catastrales (imágenes o PDFs)</p>
+                                            <p>3. Selecciona el modo de análisis</p>
+                                            <p>4. Comienza a analizar tus propiedades</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Validation Tab -->
+                    <div id="validationTab" class="tab-panel">
+                        <div class="validation-content">
+                            <h3>Documentos de Gravamen</h3>
+                            <div class="upload-area-compact">
+                                <div class="upload-content-compact">
+                                    <div class="upload-icon">📁</div>
+                                    <p>Arrastra documentos de gravamen aquí</p>
+                                    <button type="button" class="btn btn--secondary btn--sm">
+                                        Seleccionar Archivos de Gravamen
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chat Input Section -->
         <section class="chat-section">
             <div class="chat-container">
-                <div class="chat-header">
-                    <h3>Análisis de Documentos</h3>
-                    <div class="chat-actions">
-                        <button id="exportResults" class="btn btn--outline btn--sm" disabled>
-                            💾 Exportar
-                        </button>
-                        <button id="clearChat" class="btn btn--outline btn--sm" disabled>
-                            🗑️ Limpiar Chat
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="chatMessages" class="chat-messages">
-                    <div class="welcome-message">
-                        <div class="welcome-icon">📄</div>
-                        <h4>¡Bienvenido al Analizador de Cartas Catastrales!</h4>
-                        <p>1. Configura tu API key</p>
-                        <p>2. Carga tus documentos catastrales (imágenes o PDFs)</p>
-                        <p>3. Selecciona el modo de análisis</p>
-                        <p>4. Comienza a analizar tus propiedades</p>
-                    </div>
-                </div>
                 
                 <div class="chat-input-area">
                     <!-- Selected files preview -->

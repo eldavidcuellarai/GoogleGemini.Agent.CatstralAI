@@ -1,0 +1,32 @@
+{
+  "name": "catastral-analyzer-gemini",
+  "version": "1.0.0",
+  "description": "Analizador de Cartas Catastrales usando Google Gemini AI",
+  "main": "el cerebro de gemini/app.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "live-server --port=3000 --open='el cerebro de gemini/'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eldavidcuellarai/GoogleGemini.Agent.CatstralAI.git"
+  },
+  "keywords": [
+    "catastral",
+    "gemini",
+    "ai",
+    "property",
+    "analysis"
+  ],
+  "author": "eldavidcuellarai",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
