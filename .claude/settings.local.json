@@ -9,8 +9,12 @@
       "Bash(start \"C:\\Users\\cuell\\OneDrive\\Escritorio\\Catastro Gemini\\GoogleGemini.Agent.CatstralAI\\el cerebro de gemini\\index.html\")",
       "Bash(pnpm dev:*)",
       "Bash(pnpm add:*)",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(xcopy:*)"
     ],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "C:\\Users\\cuell\\OneDrive\\Escritorio"
+    ]
   }
 }
