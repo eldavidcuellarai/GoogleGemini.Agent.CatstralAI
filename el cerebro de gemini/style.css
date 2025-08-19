@@ -1705,10 +1705,34 @@ select.form-control {
     gap: var(--space-16);
     text-align: center;
   }
+
+  .header-controls {
+    flex-direction: column;
+    gap: var(--space-12);
+  }
+
+  .connection-status {
+    order: 1;
+  }
+
+  .theme-toggle {
+    order: 2;
+  }
   
   .config-form,
   .modal-content {
     padding: var(--space-16);
+  }
+
+  .config-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .upload-specs {
+    flex-direction: column;
+    gap: var(--space-12);
+    align-items: center;
   }
   
   .api-key-input,
@@ -1754,6 +1778,11 @@ select.form-control {
   
   .export-options {
     grid-template-columns: 1fr;
+  }
+
+  .selected-files-list {
+    flex-direction: column;
+    gap: var(--space-6);
   }
 }
 
