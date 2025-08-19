@@ -1,34 +1,12 @@
 {
   "version": 2,
-  "builds": [
+  "public": false,
+  "rewrites": [
     {
-      "src": "server.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "el cerebro de gemini/**/*",
-      "use": "@vercel/static"
+      "source": "/(.*)",
+      "destination": "/el cerebro de gemini/index.html"
     }
   ],
-  "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "/el cerebro de gemini/$1"
-    },
-    {
-      "src": "/(.*\\.(js|css|html|png|jpg|jpeg|gif|ico|svg))",
-      "dest": "/el cerebro de gemini/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/server.js"
-    }
-  ],
-  "functions": {
-    "server.js": {
-      "maxDuration": 30
-    }
-  },
   "headers": [
     {
       "source": "/(.*)",
@@ -39,7 +17,7 @@
         },
         {
           "key": "X-Frame-Options",
-          "value": "DENY"
+          "value": "SAMEORIGIN"
         },
         {
           "key": "X-XSS-Protection",

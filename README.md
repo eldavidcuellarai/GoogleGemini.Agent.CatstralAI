@@ -56,17 +56,33 @@ npm run dev
 
 ### Despliegue en Vercel
 
-1. Instala las dependencias
-```bash
-npm install
-```
+La aplicación está configurada para desplegarse fácilmente en Vercel:
 
-2. Despliega en Vercel
+1. **Método 1: Despliegue directo (recomendado)**
 ```bash
+# Instalar Vercel CLI si no lo tienes
+npm i -g vercel
+
+# Desplegar
 vercel --prod
 ```
 
-## 📱 Interfaz de Usuario
+2. **Método 2: Conectar con GitHub**
+- Conecta tu repositorio de GitHub con Vercel
+- Vercel detectará automáticamente la configuración
+- Cada push a main se desplegará automáticamente
+
+3. **Configuración de entorno**
+- No requiere variables de entorno del servidor
+- Los usuarios ingresan su API key directamente en la interfaz
+- La aplicación funciona completamente del lado del cliente
+
+### URLs de Prueba
+
+- **Desarrollo**: http://localhost:8080
+- **Producción**: Tu URL de Vercel después del despliegue
+
+## 🔧 Configuración
 
 La aplicación incluye:
 

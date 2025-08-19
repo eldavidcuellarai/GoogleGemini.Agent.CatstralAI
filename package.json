@@ -5,7 +5,10 @@
   "main": "el cerebro de gemini/app.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "live-server --port=3000 --open='el cerebro de gemini/'"
+    "dev": "node server.js",
+    "serve": "node server.js",
+    "test": "echo \"No tests specified\" && exit 0",
+    "vercel-dev": "vercel dev"
   },
   "repository": {
     "type": "git",
