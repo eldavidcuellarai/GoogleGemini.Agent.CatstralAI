@@ -531,73 +531,141 @@ class CatastralAnalyzer {
         }
     }
     
-    // Process file with Gemini
+    // Process file with Gemini using File API
     async processFile(file) {
-        // API key is handled by serverless function, no need to check here
-        
         try {
-            let fileContent;
-            let fileType = file.type;
-            let isScannedPDF = false;
+            console.log(`🚀 Procesando archivo: ${file.name} (${file.type})`);
             
-            if (file.type === 'application/pdf') {
-                try {
-                    fileContent = await this.extractTextFromPDF(file);
-                    console.log('✅ PDF con texto extraíble procesado');
-                } catch (error) {
-                    if (error.message.includes('no contiene texto extraíble')) {
-                        console.log('📷 PDF escaneado detectado, enviando como imagen a Gemini...');
-                        // Convert PDF to base64 for vision processing
-                        fileContent = await this.convertPDFToBase64(file);
-                        fileType = 'application/pdf-scanned'; // Custom type to handle differently
-                        isScannedPDF = true;
-                    } else {
-                        throw error;
-                    }
-                }
-            } else {
-                fileContent = await this.convertImageToBase64(file);
-            }
-            
-            // Create extraction prompt
-            const extractionPrompt = this.createExtractionPrompt(isScannedPDF);
-            
-            // Para PDFs escaneados o imágenes, usar método original
-            if (isScannedPDF || file.type.startsWith('image/')) {
-                const response = await this.callGeminiAPI(fileContent, 'gemini-2.5-pro', extractionPrompt);
-                return this.parseExtractionResponse(response);
-            }
-            
-            // Para PDFs con texto extraíble, usar chunking si es necesario
-            const chunks = this.createTextChunks(fileContent);
-            
-            if (chunks.length === 1) {
-                // Documento pequeño, procesamiento normal
-                console.log('📄 Procesando documento pequeño directamente');
-                const response = await this.callGeminiAPI(fileContent, 'gemini-2.5-pro', extractionPrompt);
-                return this.parseExtractionResponse(response);
-            } else {
-                // Documento grande, procesamiento por chunks
-                console.log(`📚 Procesando documento grande con ${chunks.length} chunks`);
-                
-                // Mostrar progreso al usuario
-                this.updateProgress(`Procesando documento en ${chunks.length} partes...`, 0);
-                
-                const chunkResults = await this.processChunksInParallel(chunks, extractionPrompt);
-                
-                this.updateProgress('Combinando resultados...', 90);
-                
-                const combinedResult = this.combineChunkResults(chunkResults);
-                
-                this.updateProgress('¡Análisis completado!', 100);
-                
-                return combinedResult;
+            // Intentar usar Google File API primero
+            try {
+                return await this.processFileWithFileAPI(file);
+            } catch (fileApiError) {
+                console.warn('⚠️ Error con File API, usando método tradicional:', fileApiError.message);
+                return await this.processFileTraditional(file);
             }
             
         } catch (error) {
             console.error('Error en processFile:', error);
             throw error;
         }
+    }
+
+    // Nueva función para procesar archivos usando Google File API
+    async processFileWithFileAPI(file) {
+        console.log('📁 Usando Google File API para procesar archivo');
+        
+        // Convertir archivo a base64
+        const fileData = await this.convertFileToBase64(file);
+        
+        // Create extraction prompt
+        const extractionPrompt = this.createExtractionPrompt(false);
+        
+        // Llamar a la API con los datos del archivo
+        const requestBody = {
+            text: extractionPrompt,
+            model: 'gemini-2.5-pro', // Usar modelo compatible con File API
+            systemPrompt: this.systemPrompt,
+            fileData: fileData,
+            fileType: file.type,
+            mimeType: file.type
+        };
+
+        console.log('📤 Enviando archivo a File API...');
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+            throw new Error('Respuesta inválida de la API de Gemini');
+        }
+
+        const responseText = data.candidates[0].content.parts[0].text;
+        return this.parseExtractionResponse(responseText);
+    }
+
+    // Función tradicional como fallback
+    async processFileTraditional(file) {
+        console.log('🔄 Usando método tradicional como fallback');
+        
+        let fileContent;
+        let fileType = file.type;
+        let isScannedPDF = false;
+        
+        if (file.type === 'application/pdf') {
+            try {
+                fileContent = await this.extractTextFromPDF(file);
+                console.log('✅ PDF con texto extraíble procesado');
+            } catch (error) {
+                if (error.message.includes('no contiene texto extraíble')) {
+                    console.log('📷 PDF escaneado detectado, enviando como imagen a Gemini...');
+                    // Convert PDF to base64 for vision processing
+                    fileContent = await this.convertPDFToBase64(file);
+                    fileType = 'application/pdf-scanned'; // Custom type to handle differently
+                    isScannedPDF = true;
+                } else {
+                    throw error;
+                }
+            }
+        } else {
+            fileContent = await this.convertImageToBase64(file);
+        }
+        
+        // Create extraction prompt
+        const extractionPrompt = this.createExtractionPrompt(isScannedPDF);
+        
+        // Para PDFs escaneados o imágenes, usar método original
+        if (isScannedPDF || file.type.startsWith('image/')) {
+            const response = await this.callGeminiAPI(fileContent, 'gemini-2.5-pro', extractionPrompt);
+            return this.parseExtractionResponse(response);
+        }
+        
+        // Para PDFs con texto extraíble, usar chunking si es necesario
+        const chunks = this.createTextChunks(fileContent);
+        
+        if (chunks.length === 1) {
+            // Documento pequeño, procesamiento normal
+            console.log('📄 Procesando documento pequeño directamente');
+            const response = await this.callGeminiAPI(fileContent, 'gemini-2.5-pro', extractionPrompt);
+            return this.parseExtractionResponse(response);
+        } else {
+            // Documento grande, procesamiento por chunks
+            console.log(`📚 Procesando documento grande con ${chunks.length} chunks`);
+            
+            // Mostrar progreso al usuario
+            this.updateProgress(`Procesando documento en ${chunks.length} partes...`, 0);
+            
+            const chunkResults = await this.processChunksInParallel(chunks, extractionPrompt);
+            
+            this.updateProgress('Combinando resultados...', 90);
+            
+            const combinedResult = this.combineChunkResults(chunkResults);
+            
+            this.updateProgress('¡Análisis completado!', 100);
+            
+            return combinedResult;
+        }
+    }
+
+    // Convertir archivo completo a base64 (para File API)
+    async convertFileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // Remover el prefijo data:type;base64, para obtener solo el base64
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
     }
     
     // Extract text from PDF
@@ -698,37 +766,71 @@ PÁGINA ${i + 1}:`;
         }
     }
     
-    // Analyze image with Gemini (using regular model, not Vision API)
+    // Analyze image with Gemini using File API
     async analyzeImageWithGemini(imageData, prompt) {
         try {
-            console.log('🔍 Analizando imagen con Gemini...');
+            console.log('🔍 Analizando imagen con Gemini usando File API...');
             
             // Remove data:image/jpeg;base64, prefix
             const base64Data = imageData.split(',')[1];
             
-            const requestBody = {
-                text: prompt,
-                model: 'gemini-2.5-flash',
-                image: base64Data,
-                systemPrompt: 'Eres un experto en OCR y análisis de documentos catastrales. Extrae toda la información visible de la imagen de manera precisa y estructurada.'
-            };
+            // Intentar primero con File API
+            try {
+                const requestBody = {
+                    text: prompt,
+                    model: 'gemini-2.5-flash', // Usar modelo compatible con File API
+                    systemPrompt: 'Eres un experto en OCR y análisis de documentos catastrales. Extrae toda la información visible de la imagen de manera precisa y estructurada.',
+                    fileData: base64Data,
+                    fileType: 'image/jpeg',
+                    mimeType: 'image/jpeg'
+                };
 
-            const response = await fetch('/api/gemini', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            });
+                const response = await fetch('/api/gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
 
-            if (!response.ok) {
-                throw new Error(`Gemini API error: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`File API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+                    throw new Error('No content generated from File API image analysis');
+                }
+
+                console.log('✅ Imagen analizada exitosamente con File API');
+                return data.candidates[0].content.parts[0].text;
+            } catch (fileApiError) {
+                console.warn('⚠️ File API falló, usando método tradicional:', fileApiError.message);
+                
+                // Fallback al método tradicional
+                const requestBody = {
+                    text: prompt,
+                    model: 'gemini-2.5-flash',
+                    image: base64Data,
+                    systemPrompt: 'Eres un experto en OCR y análisis de documentos catastrales. Extrae toda la información visible de la imagen de manera precisa y estructurada.'
+                };
+
+                const response = await fetch('/api/gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Gemini API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+                    throw new Error('No content generated from image analysis');
+                }
+
+                console.log('✅ Imagen analizada con método tradicional como fallback');
+                return data.candidates[0].content.parts[0].text;
             }
-
-            const data = await response.json();
-            if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-                throw new Error('No content generated from image analysis');
-            }
-
-            return data.candidates[0].content.parts[0].text;
         } catch (error) {
             console.error('Error analyzing image with Gemini:', error);
             throw error;
