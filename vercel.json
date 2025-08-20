@@ -1,6 +1,35 @@
 {
-  "buildCommand": "cd v0-registro-de-la-propiedad && pnpm install && pnpm build",
-  "outputDirectory": "v0-registro-de-la-propiedad/.next",
-  "installCommand": "cd v0-registro-de-la-propiedad && pnpm install",
-  "framework": "nextjs"
+  "version": 2,
+  "public": true,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/el cerebro de gemini/$1"
+    },
+    {
+      "source": "/",
+      "destination": "/el cerebro de gemini/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ]
 }
