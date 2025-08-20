@@ -621,6 +621,14 @@ class CatastralAnalyzer {
                 .trim();
             
             console.log(`✅ Texto extraído y limpiado: ${cleanedText.length} caracteres totales`);
+            
+            // Limitar tamaño para evitar error 413 en Cloud Run
+            const MAX_CHARS = 50000; // Límite seguro para Cloud Run
+            if (cleanedText.length > MAX_CHARS) {
+                console.log(`⚠️ Texto muy largo (${cleanedText.length} chars). Recortando a ${MAX_CHARS} caracteres`);
+                return cleanedText.substring(0, MAX_CHARS) + '\n\n[TEXTO RECORTADO - DOCUMENTO MUY LARGO]';
+            }
+            
             return cleanedText;
         } catch (error) {
             console.error('Error extracting PDF text:', error);

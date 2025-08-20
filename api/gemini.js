@@ -4,6 +4,16 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
+    // Configurar headers para CORS y contenido
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    // Manejar preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
     // Verificar que la API key esté configurada
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -15,6 +25,16 @@ export default async function handler(req, res) {
 
         if (!text) {
             return res.status(400).json({ error: 'Text is required' });
+        }
+
+        // Verificar tamaño del payload
+        let processedText = text;
+        const textSize = new TextEncoder().encode(text).length;
+        console.log(`📊 Tamaño del texto: ${textSize} bytes (${text.length} caracteres)`);
+        
+        if (textSize > 1048576) { // 1MB límite
+            console.log('⚠️ Texto muy grande, recortando...');
+            processedText = text.substring(0, 30000) + '\n\n[TEXTO RECORTADO PARA PROCESAR]';
         }
 
         // Preparar el contenido para Gemini
@@ -29,7 +49,7 @@ export default async function handler(req, res) {
             {
                 parts: [
                     {
-                        text: text
+                        text: processedText
                     }
                 ]
             }
