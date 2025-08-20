@@ -637,7 +637,16 @@ class CatastralAnalyzer {
             
             // Check if PDF has extractable text (not just scanned images)
             if (totalTextLength < 50) {
-                throw new Error('❌ Este PDF no contiene texto extraíble. Parece ser escaneado (requiere OCR).');
+                console.warn('⚠️ PDF parece ser escaneado, intentando procesar imagen...');
+                
+                // Try to extract as image-based PDF for Gemini Vision
+                const imageData = await this.extractPDFAsImages(file);
+                if (imageData && imageData.length > 0) {
+                    // Send the first page as image to Gemini Vision
+                    return await this.processImageWithGemini(imageData[0], file);
+                }
+                
+                throw new Error('❌ Este PDF no contiene texto extraíble y no se pudo procesar como imagen. Intenta con un PDF con texto seleccionable o convierte el documento a un formato con OCR.');
             }
             
             // Basic text cleanup like v0 version
@@ -658,6 +667,118 @@ class CatastralAnalyzer {
                 throw error; // Re-throw as is for scanned PDFs
             }
             throw new Error('Error al extraer texto del PDF: ' + error.message);
+        }
+    }
+    
+    // Extract PDF pages as images for OCR processing
+    async extractPDFAsImages(file) {
+        try {
+            console.log('🖼️ Intentando extraer PDF como imágenes...');
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const images = [];
+            
+            // Only process first 3 pages to avoid too much data
+            const maxPages = Math.min(pdf.numPages, 3);
+            
+            for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const scale = 2.0; // Higher scale for better OCR
+                const viewport = page.getViewport({ scale });
+                
+                // Create canvas
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                // Render page to canvas
+                await page.render({
+                    canvasContext: context,
+                    viewport: viewport
+                }).promise;
+                
+                // Convert to base64
+                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                images.push(imageData);
+                
+                console.log(`🖼️ Página ${pageNum} convertida a imagen`);
+            }
+            
+            return images;
+        } catch (error) {
+            console.error('Error extracting PDF as images:', error);
+            return null;
+        }
+    }
+    
+    // Process image with Gemini Vision
+    async processImageWithGemini(imageData, file) {
+        try {
+            console.log('👁️ Procesando imagen con Gemini Vision...');
+            
+            // Remove data:image/jpeg;base64, prefix
+            const base64Data = imageData.split(',')[1];
+            
+            const visionPrompt = `
+Analiza esta imagen de un documento catastral y extrae toda la información visible.
+El documento puede contener información sobre:
+- Propietario(s)
+- Dirección/ubicación de la propiedad
+- Datos catastrales (clave catastral, cuenta predial, etc.)
+- Características de la construcción
+- Valores oficiales
+- Fechas importantes
+
+Extrae toda la información que puedas leer en la imagen y organízala de manera estructurada.
+`;
+
+            // For vision, we need to modify the call to handle images
+            const visionResult = await this.callGeminiVision(base64Data, visionPrompt);
+            
+            console.log('✅ Análisis de imagen completado');
+            
+            return {
+                extractedText: visionResult,
+                isScanned: true,
+                ocrProcessed: true
+            };
+            
+        } catch (error) {
+            console.error('Error processing image with Gemini Vision:', error);
+            throw error;
+        }
+    }
+    
+    // Call Gemini Vision API for image processing
+    async callGeminiVision(base64Image, prompt) {
+        try {
+            const requestBody = {
+                text: prompt,
+                model: 'gemini-2.5-flash',
+                image: base64Image,
+                systemPrompt: 'Eres un experto en OCR y análisis de documentos catastrales. Extrae toda la información visible de la imagen de manera precisa y estructurada.'
+            };
+
+            const response = await fetch('/api/gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Vision API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+                throw new Error('No content generated from vision analysis');
+            }
+
+            return data.candidates[0].content.parts[0].text;
+        } catch (error) {
+            console.error('Error calling Gemini Vision API:', error);
+            throw error;
         }
     }
     

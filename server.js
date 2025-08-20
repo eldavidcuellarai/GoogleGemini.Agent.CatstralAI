@@ -28,7 +28,7 @@ app.post('/api/gemini', async (req, res) => {
     }
 
     try {
-        const { text, model = 'gemini-2.5-pro', systemPrompt } = req.body;
+        const { text, model = 'gemini-2.5-pro', systemPrompt, image } = req.body;
 
         if (!text) {
             return res.status(400).json({ error: 'Text is required' });
@@ -42,22 +42,51 @@ app.post('/api/gemini', async (req, res) => {
         const processedText = text;
 
         // Preparar el contenido para Gemini
-        const contents = [
-            {
-                parts: [
-                    {
-                        text: systemPrompt || 'Eres un experto analista de documentos catastrales especializado en el análisis técnico y legal de propiedades.'
-                    }
-                ]
-            },
-            {
-                parts: [
-                    {
-                        text: processedText
-                    }
-                ]
-            }
-        ];
+        let contents;
+        
+        if (image) {
+            // For vision requests with images
+            contents = [
+                {
+                    parts: [
+                        {
+                            text: systemPrompt || 'Eres un experto en OCR y análisis de documentos catastrales. Extrae toda la información visible de la imagen de manera precisa y estructurada.'
+                        }
+                    ]
+                },
+                {
+                    parts: [
+                        {
+                            text: processedText
+                        },
+                        {
+                            inline_data: {
+                                mime_type: "image/jpeg",
+                                data: image
+                            }
+                        }
+                    ]
+                }
+            ];
+        } else {
+            // For text-only requests
+            contents = [
+                {
+                    parts: [
+                        {
+                            text: systemPrompt || 'Eres un experto analista de documentos catastrales especializado en el análisis técnico y legal de propiedades.'
+                        }
+                    ]
+                },
+                {
+                    parts: [
+                        {
+                            text: processedText
+                        }
+                    ]
+                }
+            ];
+        }
 
         // Configuración de generación
         const generationConfig = {
