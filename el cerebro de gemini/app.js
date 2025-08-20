@@ -1,11 +1,15 @@
 class CatastralAnalyzer {
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+    }
     constructor() {
         this.apiKey = '';
         this.systemPrompt = '';
-        this.conversationHistory = [];
         this.uploadedFiles = [];
-        this.selectedFiles = [];
-        this.processingMode = 'sequential';
         this.maxFiles = 10;
         this.maxTotalSize = 50 * 1024 * 1024; // 50MB
         this.maxSingleFile = 20 * 1024 * 1024; // 20MB
@@ -24,11 +28,11 @@ class CatastralAnalyzer {
         
         this.initializeElements();
         this.bindEvents();
-        this.loadConfiguration();
         this.setupPDFJS();
         this.initializeTabs();
-        this.initializeFileUpload();
-        this.initializeDocumentTypeSlider();
+
+        // Initialize Gemini Model
+        this.geminiModel = null;
     }
     
     initializeElements() {
@@ -41,14 +45,11 @@ class CatastralAnalyzer {
         this.themeToggle = document.getElementById('themeToggle');
         
         // Upload elements
-        this.uploadArea = document.getElementById('uploadArea');
-        this.fileInput = document.getElementById('fileInput');
-        this.fileGallery = document.getElementById('fileGallery');
-        this.fileList = document.getElementById('fileList');
-        this.fileCount = document.getElementById('fileCount');
-        this.selectAllBtn = document.getElementById('selectAllFiles');
-        this.clearAllBtn = document.getElementById('clearAllFiles');
-        this.sortFiles = document.getElementById('sortFiles');
+        this.uploadArea = document.getElementById('uploadAreaCompact');
+        this.fileInput = document.getElementById('fileInputCompact');
+        this.fileGallery = document.getElementById('uploadedFilesList');
+        this.fileList = document.getElementById('uploadedFilesList');
+        this.selectFilesBtn = document.getElementById('selectFilesBtn');
         
         // Processing mode elements
         this.processingModeInputs = document.querySelectorAll('input[name="processingMode"]');
@@ -86,19 +87,13 @@ class CatastralAnalyzer {
         // Configuration events
         this.saveConfigBtn.addEventListener('click', () => this.saveConfiguration());
         this.toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility());
-        this.themeToggle.addEventListener('click', () => this.toggleTheme());
         
         // Upload events
-        this.uploadArea.addEventListener('click', () => this.fileInput.click());
+        this.selectFilesBtn.addEventListener('click', () => this.fileInput.click());
         this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         this.uploadArea.addEventListener('dragover', (e) => this.handleDragOver(e));
         this.uploadArea.addEventListener('dragleave', (e) => this.handleDragLeave(e));
         this.uploadArea.addEventListener('drop', (e) => this.handleDrop(e));
-        
-        // File management events
-        this.selectAllBtn.addEventListener('click', () => this.selectAllFiles());
-        this.clearAllBtn.addEventListener('click', () => this.clearAllFiles());
-        this.sortFiles.addEventListener('change', () => this.sortFileList());
         
         // Processing mode events
         this.processingModeInputs.forEach(input => {
@@ -160,8 +155,54 @@ class CatastralAnalyzer {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
     
+    getEnvironmentVariable(name) {
+        // In browser environment, try to access from window object or meta tags
+        if (typeof window !== 'undefined') {
+            // Check if environment variables are exposed via window object (Vercel, Netlify, etc.)
+            if (window.process && window.process.env && window.process.env[name]) {
+                return window.process.env[name];
+            }
+            
+            // Check for meta tags with environment variables
+            const metaTag = document.querySelector(`meta[name="env-${name.toLowerCase()}"]`);
+            if (metaTag) {
+                return metaTag.getAttribute('content');
+            }
+            
+            // Check for global variables (some deployment platforms expose them this way)
+            if (window[name]) {
+                return window[name];
+            }
+        }
+        
+        return null;
+    }
+    
     loadConfiguration() {
         try {
+            // Try to get API key from environment variable first
+            const envApiKey = this.getEnvironmentVariable('GEMINI_API_KEY') || this.getEnvironmentVariable('GOOGLE_GENERATIVE_AI_API_KEY');
+            
+            if (envApiKey) {
+                this.apiKey = envApiKey;
+                this.apiKeyInput.value = '••••••••••••••••'; // Show masked value
+                this.apiKeyInput.disabled = true;
+                console.log('Using API key from environment variable');
+                
+                // Load system prompt from localStorage or use default
+                const savedConfig = localStorage.getItem('catastral-analyzer-config');
+                if (savedConfig) {
+                    const config = JSON.parse(savedConfig);
+                    this.systemPromptInput.value = config.systemPrompt || this.systemPromptInput.value;
+                    this.systemPrompt = config.systemPrompt || this.systemPromptInput.value;
+                }
+                
+                this.enableInterface();
+                this.showConfigStatus(true, 'Configuración cargada desde variables de entorno');
+                return;
+            }
+            
+            // Fallback to localStorage configuration
             const savedConfig = localStorage.getItem('catastral-analyzer-config');
             if (savedConfig) {
                 const config = JSON.parse(savedConfig);
@@ -187,11 +228,43 @@ class CatastralAnalyzer {
     }
     
     saveConfiguration() {
-        const apiKey = this.apiKeyInput.value.trim();
         const systemPrompt = this.systemPromptInput.value.trim();
         
+        // Check if API key is already loaded from environment
+        if (this.apiKeyInput.disabled && this.apiKey) {
+            // API key comes from environment, only save system prompt
+            if (!systemPrompt) {
+                this.showError('Por favor define un System Prompt');
+                this.systemPromptInput.focus();
+                return;
+            }
+            
+            this.systemPrompt = systemPrompt;
+            
+            // Save only system prompt to localStorage
+            try {
+                const currentTheme = document.documentElement.getAttribute('data-color-scheme');
+                const existingConfig = JSON.parse(localStorage.getItem('catastral-analyzer-config') || '{}');
+                localStorage.setItem('catastral-analyzer-config', JSON.stringify({
+                    ...existingConfig,
+                    systemPrompt: systemPrompt,
+                    theme: currentTheme
+                }));
+            } catch (error) {
+                console.warn('Error saving configuration:', error);
+            }
+            
+            this.enableInterface();
+            this.showConfigStatus(true, '✓ System Prompt guardado (API Key desde variables de entorno)');
+            this.clearWelcomeMessage();
+            return;
+        }
+        
+        // Manual API key configuration
+        const apiKey = this.apiKeyInput.value.trim();
+        
         if (!apiKey) {
-            this.showError('Por favor ingresa tu API Key de Gemini');
+            this.showError('Por favor ingresa tu API Key de Gemini o configúrala como variable de entorno');
             this.apiKeyInput.focus();
             return;
         }
@@ -277,16 +350,16 @@ class CatastralAnalyzer {
         this.themeToggle.textContent = theme === 'dark' ? '☀️ Tema' : '🌙 Tema';
     }
     
-    showConfigStatus(success) {
+    showConfigStatus(success, message = null) {
         this.configStatus.classList.remove('hidden');
         const statusDiv = this.configStatus.querySelector('.status');
         
         if (success) {
             statusDiv.className = 'status status--success';
-            statusDiv.textContent = '✓ Configuración guardada correctamente';
+            statusDiv.textContent = message || '✓ Configuración guardada correctamente';
         } else {
             statusDiv.className = 'status status--error';
-            statusDiv.textContent = '✗ Error en la configuración';
+            statusDiv.textContent = message || '✗ Error en la configuración';
         }
         
         setTimeout(() => {
@@ -500,17 +573,16 @@ class CatastralAnalyzer {
     
     createFileElement(fileData) {
         const div = document.createElement('div');
-        div.className = `file-item ${fileData.selected ? 'selected' : ''}`;
+        div.className = 'file-item';
         div.setAttribute('data-file-id', fileData.id);
         
         const previewIcon = fileData.type === 'application/pdf' ? '📄' : '🖼️';
         const sizeText = this.formatFileSize(fileData.size);
         
         div.innerHTML = `
-            <input type="checkbox" class="file-checkbox" ${fileData.selected ? 'checked' : ''}>
             <div class="file-preview">
                 ${fileData.preview 
-                    ? `<img src="${fileData.preview}" alt="Preview">`
+                    ? `<img src="${fileData.preview}" alt="Preview" style="max-width: 100%; max-height: 100px; object-fit: contain;">`
                     : `<div class="file-preview-icon">${previewIcon}</div>`
                 }
             </div>
@@ -520,10 +592,9 @@ class CatastralAnalyzer {
                     <span>${fileData.type.split('/')[1].toUpperCase()}</span>
                     <span>${sizeText}</span>
                 </div>
-                <div class="file-actions">
-                    <button class="file-action-btn preview" title="Vista previa">👁️</button>
-                    <button class="file-action-btn delete" title="Eliminar">🗑️</button>
-                </div>
+                <button class="btn btn--outline btn--sm delete-file" title="Eliminar">
+                    <span>🗑️</span>
+                </button>
             </div>
         `;
         
