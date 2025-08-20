@@ -7,22 +7,18 @@ class CatastralAnalyzer {
         this.currentDocumentType = 'propiedad';
         this.extractedData = null;
         this.processingFiles = new Map(); // Track processing files
-        this.geminiModel = 'gemini-2.5-pro';
-        this.geminiFallbackModel = 'gemini-2.5-flash';
+        this.geminiModel = 'gemini-2.0-flash-exp';
+        this.geminiFallbackModel = 'gemini-1.5-flash';
 
-        // Initialize immediately with error handling
-        try {
-            this.initializeElements();
-            this.bindEvents();
-            this.loadConfiguration();
-            this.setupPDFJS();
-            this.initializeTabs();
-            this.initializeFileUpload();
-            this.initializeDocumentTypeSlider();
-            this.initializeChat();
-        } catch (error) {
-            console.error('❌ Error durante la inicialización:', error);
-        }
+        // Initialize immediately
+        this.initializeElements();
+        this.bindEvents();
+        this.loadConfiguration();
+        this.setupPDFJS();
+        this.initializeTabs();
+        this.initializeFileUpload();
+        this.initializeDocumentTypeSlider();
+        this.initializeChat();
     }
     
     initializeElements() {
@@ -98,38 +94,10 @@ class CatastralAnalyzer {
     }
     
     setupPDFJS() {
-        // Configure PDF.js worker with multiple fallbacks
-        try {
-            if (typeof pdfjsLib !== 'undefined') {
-                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-                console.log('✅ PDF.js configurado correctamente');
-                return true;
-            } else {
-                console.warn('⚠️ PDF.js no está disponible, intentando cargar...');
-                // Try to load PDF.js dynamically
-                this.loadPDFJSDynamically();
-                return false;
-            }
-        } catch (error) {
-            console.error('❌ Error configurando PDF.js:', error);
-            return false;
+        // Configure PDF.js worker
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         }
-    }
-    
-    // Load PDF.js dynamically if not available
-    loadPDFJSDynamically() {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js';
-        script.onload = () => {
-            console.log('📄 PDF.js cargado dinámicamente');
-            if (typeof pdfjsLib !== 'undefined') {
-                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-            }
-        };
-        script.onerror = () => {
-            console.error('❌ Error cargando PDF.js dinámicamente');
-        };
-        document.head.appendChild(script);
     }
     
     getEnvironmentVariable(name) {
@@ -742,34 +710,21 @@ class CatastralAnalyzer {
     // Extract text from PDF
     async extractTextFromPDF(file) {
         try {
-            // Check if PDF.js is available
-            if (typeof pdfjsLib === 'undefined') {
-                throw new Error('PDF.js no está disponible. La biblioteca no se cargó correctamente.');
-            }
-            
-            console.log('📄 Extrayendo texto del PDF:', file.name);
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let fullText = '';
-            
-            console.log(`📖 PDF tiene ${pdf.numPages} páginas`);
             
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                 const page = await pdf.getPage(pageNum);
                 const textContent = await page.getTextContent();
                 const pageText = textContent.items.map(item => item.str).join(' ');
                 fullText += pageText + '\\n\\n';
-                console.log(`📄 Página ${pageNum} procesada: ${pageText.length} caracteres`);
             }
             
-            console.log(`✅ Texto extraído: ${fullText.length} caracteres totales`);
             return fullText;
         } catch (error) {
             console.error('Error extracting PDF text:', error);
-            if (error.message.includes('PDF.js no está disponible')) {
-                throw new Error('PDF.js no se cargó correctamente. Recarga la página e intenta de nuevo.');
-            }
-            throw new Error('Error al extraer texto del PDF: ' + error.message);
+            throw new Error('Error al extraer texto del PDF');
         }
     }
     
@@ -979,8 +934,6 @@ ${extractionFields}`;
     // Parse extraction response
     parseExtractionResponse(response) {
         try {
-            console.log('🔍 Raw response from Gemini:', response);
-            
             // Clean response and parse JSON
             let cleanResponse = response.trim();
             // Remove markdown code block (```json ... ``` or ``` ... ```)
@@ -991,12 +944,8 @@ ${extractionFields}`;
             }
             // Remove any stray backticks or code block remnants
             cleanResponse = cleanResponse.replace(/^```+|```+$/g, '').trim();
-            
-            console.log('🧹 Cleaned response:', cleanResponse);
-            
             // Now try to parse
             const parsedData = JSON.parse(cleanResponse);
-            console.log('📊 Parsed data:', parsedData);
             return {
                 datos_extraidos: parsedData,
                 timestamp: new Date().toISOString(),
@@ -1035,7 +984,6 @@ ${extractionFields}`;
     
     // Display extracted data
     displayExtractedData(extractedData) {
-        console.log('🎯 Displaying extracted data:', extractedData);
         this.extractedData = extractedData;
         
         // Hide no data message
@@ -1068,18 +1016,12 @@ ${extractionFields}`;
     
     // Display functions for each section
     displayInformacionPredio(data) {
-        console.log('🏠 Displaying informacion_predio:', data);
         const card = document.getElementById('informacionPredioCard');
         const content = document.getElementById('informacionPredioContent');
         
-        if (!card || !content) {
-            console.error('❌ Card or content element not found for informacion_predio');
-            return;
-        }
+        if (!card || !content) return;
         
-        const htmlContent = this.createDataRows(data);
-        console.log('📝 Generated HTML for informacion_predio:', htmlContent);
-        content.innerHTML = htmlContent;
+        content.innerHTML = this.createDataRows(data);
         card.style.display = 'block';
     }
     
@@ -1212,20 +1154,11 @@ ${extractionFields}`;
     
     // Create data rows HTML
     createDataRows(data) {
-        console.log('📋 Creating data rows for:', data);
-        
-        if (!data || typeof data !== 'object') {
-            console.log('⚠️ No data or invalid data type');
-            return '<p>No hay datos disponibles</p>';
-        }
+        if (!data || typeof data !== 'object') return '<p>No hay datos disponibles</p>';
         
         let html = '';
-        let validFields = 0;
-        
         for (let [key, value] of Object.entries(data)) {
-            console.log(`🔍 Processing field: ${key} = ${value}`);
             if (value && value !== 'NO_CONSTA' && value !== '') {
-                validFields++;
                 const label = this.formatLabel(key);
                 html += `
                     <div class="data-row">
@@ -1236,7 +1169,6 @@ ${extractionFields}`;
             }
         }
         
-        console.log(`📊 Generated ${validFields} valid fields, HTML length: ${html.length}`);
         return html || '<p>No hay datos disponibles</p>';
     }
     
@@ -1536,8 +1468,7 @@ ${extractionFields}`;
     
     // Call chat with Gemini - Fixed version
     async callChatWithGemini(message) {
-        let model = this.geminiModel || 'gemini-2.5-pro';
-        let url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel}:generateContent?key=${this.apiKey}`;
         
         let contextPrompt = `Eres un experto analista de documentos catastrales y notariales mexicanos. Tu función es:
 
@@ -1615,7 +1546,7 @@ IMPORTANTE:
             console.log('Sending chat request to:', url);
             console.log('Request body:', JSON.stringify(requestBody, null, 2));
             
-            let response = await fetch(url, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1623,39 +1554,22 @@ IMPORTANTE:
                 body: JSON.stringify(requestBody)
             });
             
-            if (!response.ok) {
-                // Fallback to alternate model if available
-                if (model !== this.geminiFallbackModel) {
-                    console.log(`Chat: Trying fallback model ${this.geminiFallbackModel}`);
-                    model = this.geminiFallbackModel;
-                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
-                    response = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(requestBody)
-                    });
-                }
-                
-                if (!response.ok) {
-                    const responseText = await response.text();
-                    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-                    try {
-                        const errorData = JSON.parse(responseText);
-                        if (errorData.error && errorData.error.message) {
-                            errorMessage += ` - ${errorData.error.message}`;
-                        }
-                    } catch (e) {
-                        errorMessage += ` - ${responseText}`;
-                    }
-                    throw new Error(errorMessage);
-                }
-            }
-            
             const responseText = await response.text();
             console.log('Response status:', response.status);
-            console.log('Chat using model:', model);
+            console.log('Response text:', responseText);
+            
+            if (!response.ok) {
+                let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                try {
+                    const errorData = JSON.parse(responseText);
+                    if (errorData.error && errorData.error.message) {
+                        errorMessage += ` - ${errorData.error.message}`;
+                    }
+                } catch (e) {
+                    errorMessage += ` - ${responseText}`;
+                }
+                throw new Error(errorMessage);
+            }
             
             const data = JSON.parse(responseText);
             
