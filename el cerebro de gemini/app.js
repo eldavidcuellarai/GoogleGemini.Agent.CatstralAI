@@ -562,10 +562,37 @@ class CatastralAnalyzer {
             // Create extraction prompt
             const extractionPrompt = this.createExtractionPrompt(isScannedPDF);
             
-            // Call Gemini API
-            const response = await this.callGeminiAPI(extractionPrompt, fileContent, fileType);
+            // Para PDFs escaneados o imágenes, usar método original
+            if (isScannedPDF || file.type.startsWith('image/')) {
+                const response = await this.callGeminiAPI(fileContent, 'gemini-2.5-pro', extractionPrompt);
+                return this.parseExtractionResponse(response);
+            }
             
-            return this.parseExtractionResponse(response);
+            // Para PDFs con texto extraíble, usar chunking si es necesario
+            const chunks = this.createTextChunks(fileContent);
+            
+            if (chunks.length === 1) {
+                // Documento pequeño, procesamiento normal
+                console.log('📄 Procesando documento pequeño directamente');
+                const response = await this.callGeminiAPI(fileContent, 'gemini-2.5-pro', extractionPrompt);
+                return this.parseExtractionResponse(response);
+            } else {
+                // Documento grande, procesamiento por chunks
+                console.log(`📚 Procesando documento grande con ${chunks.length} chunks`);
+                
+                // Mostrar progreso al usuario
+                this.updateProgress(`Procesando documento en ${chunks.length} partes...`, 0);
+                
+                const chunkResults = await this.processChunksInParallel(chunks, extractionPrompt);
+                
+                this.updateProgress('Combinando resultados...', 90);
+                
+                const combinedResult = this.combineChunkResults(chunkResults);
+                
+                this.updateProgress('¡Análisis completado!', 100);
+                
+                return combinedResult;
+            }
             
         } catch (error) {
             console.error('Error en processFile:', error);
@@ -621,14 +648,6 @@ class CatastralAnalyzer {
                 .trim();
             
             console.log(`✅ Texto extraído y limpiado: ${cleanedText.length} caracteres totales`);
-            
-            // Limitar tamaño para evitar error 413 en Cloud Run
-            const MAX_CHARS = 50000; // Límite seguro para Cloud Run
-            if (cleanedText.length > MAX_CHARS) {
-                console.log(`⚠️ Texto muy largo (${cleanedText.length} chars). Recortando a ${MAX_CHARS} caracteres`);
-                return cleanedText.substring(0, MAX_CHARS) + '\n\n[TEXTO RECORTADO - DOCUMENTO MUY LARGO]';
-            }
-            
             return cleanedText;
         } catch (error) {
             console.error('Error extracting PDF text:', error);
@@ -668,6 +687,209 @@ class CatastralAnalyzer {
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
+    }
+    
+    // Dividir texto en chunks inteligentes preservando contexto
+    createTextChunks(text, maxChunkSize = 40000) {
+        if (text.length <= maxChunkSize) {
+            return [text];
+        }
+        
+        console.log(`📄 Dividiendo texto de ${text.length} caracteres en chunks de máximo ${maxChunkSize}`);
+        
+        const chunks = [];
+        const pages = text.split('--- PÁGINA');
+        let currentChunk = '';
+        let chunkCount = 0;
+        
+        for (let i = 0; i < pages.length; i++) {
+            const page = i === 0 ? pages[i] : '--- PÁGINA' + pages[i];
+            
+            // Si agregar esta página excede el límite, guardar chunk actual
+            if (currentChunk.length + page.length > maxChunkSize && currentChunk.length > 0) {
+                chunks.push({
+                    text: currentChunk.trim(),
+                    chunkNumber: ++chunkCount,
+                    startPage: chunks.length === 0 ? 1 : chunks[chunks.length - 1].endPage + 1,
+                    endPage: i
+                });
+                currentChunk = page;
+            } else {
+                currentChunk += (currentChunk ? '\n\n' : '') + page;
+            }
+        }
+        
+        // Agregar último chunk
+        if (currentChunk.trim()) {
+            chunks.push({
+                text: currentChunk.trim(),
+                chunkNumber: ++chunkCount,
+                startPage: chunks.length === 0 ? 1 : chunks[chunks.length - 1].endPage + 1,
+                endPage: pages.length
+            });
+        }
+        
+        console.log(`✂️ Texto dividido en ${chunks.length} chunks`);
+        return chunks;
+    }
+    
+    // Procesar chunks en paralelo con límite de concurrencia
+    async processChunksInParallel(chunks, systemPrompt, maxConcurrent = 3) {
+        console.log(`🔄 Procesando ${chunks.length} chunks con máximo ${maxConcurrent} concurrentes`);
+        
+        const results = [];
+        
+        for (let i = 0; i < chunks.length; i += maxConcurrent) {
+            const batch = chunks.slice(i, i + maxConcurrent);
+            const batchPromises = batch.map(async (chunk, batchIndex) => {
+                const chunkIndex = i + batchIndex;
+                try {
+                    console.log(`📤 Procesando chunk ${chunk.chunkNumber}/${chunks.length} (páginas ${chunk.startPage}-${chunk.endPage})`);
+                    
+                    const chunkPrompt = `${systemPrompt}
+                    
+INFORMACIÓN DEL CHUNK:
+- Chunk ${chunk.chunkNumber} de ${chunks.length}
+- Páginas ${chunk.startPage} a ${chunk.endPage}
+- IMPORTANTE: Este es un fragmento de un documento más grande. Extrae toda la información disponible en este fragmento.
+
+DOCUMENTO A ANALIZAR:
+${chunk.text}`;
+
+                    const result = await this.callGeminiAPI(chunk.text, 'gemini-2.5-flash', chunkPrompt);
+                    
+                    console.log(`✅ Chunk ${chunk.chunkNumber} procesado exitosamente`);
+                    return {
+                        chunkNumber: chunk.chunkNumber,
+                        startPage: chunk.startPage,
+                        endPage: chunk.endPage,
+                        result: result,
+                        success: true
+                    };
+                } catch (error) {
+                    console.error(`❌ Error procesando chunk ${chunk.chunkNumber}:`, error);
+                    return {
+                        chunkNumber: chunk.chunkNumber,
+                        startPage: chunk.startPage,
+                        endPage: chunk.endPage,
+                        error: error.message,
+                        success: false
+                    };
+                }
+            });
+            
+            const batchResults = await Promise.all(batchPromises);
+            results.push(...batchResults);
+            
+            // Pausa pequeña entre lotes para no sobrecargar la API
+            if (i + maxConcurrent < chunks.length) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+        
+        return results;
+    }
+    
+    // Combinar resultados de múltiples chunks
+    combineChunkResults(chunkResults) {
+        console.log('🔄 Combinando resultados de chunks...');
+        
+        const successfulChunks = chunkResults.filter(r => r.success);
+        const failedChunks = chunkResults.filter(r => !r.success);
+        
+        if (failedChunks.length > 0) {
+            console.warn(`⚠️ ${failedChunks.length} chunks fallaron:`, failedChunks.map(f => f.chunkNumber));
+        }
+        
+        if (successfulChunks.length === 0) {
+            throw new Error('❌ Ningún chunk se procesó exitosamente');
+        }
+        
+        // Combinar datos extraídos
+        const combinedData = {
+            // Datos básicos del documento
+            tipo_documento: '',
+            numero_escritura: '',
+            fecha_escritura: '',
+            notaria: '',
+            notario: '',
+            
+            // Información catastral
+            clave_catastral: '',
+            numero_cuenta_predial: '',
+            superficie_terreno: '',
+            superficie_construccion: '',
+            
+            // Ubicación
+            direccion_completa: '',
+            colonia: '',
+            municipio: '',
+            estado: '',
+            codigo_postal: '',
+            
+            // Propietarios
+            propietarios: [],
+            
+            // Información adicional
+            uso_suelo: '',
+            tipo_propiedad: '',
+            regimen_propiedad: '',
+            
+            // Metadata
+            chunks_procesados: successfulChunks.length,
+            chunks_fallidos: failedChunks.length,
+            paginas_totales: Math.max(...successfulChunks.map(c => c.endPage))
+        };
+        
+        // Procesar cada chunk exitoso
+        successfulChunks.forEach(chunk => {
+            try {
+                const chunkData = JSON.parse(chunk.result);
+                
+                // Combinar campos de texto (tomar el más completo)
+                Object.keys(combinedData).forEach(key => {
+                    if (typeof combinedData[key] === 'string' && chunkData[key]) {
+                        if (!combinedData[key] || chunkData[key].length > combinedData[key].length) {
+                            combinedData[key] = chunkData[key];
+                        }
+                    }
+                });
+                
+                // Combinar arrays (propietarios)
+                if (chunkData.propietarios && Array.isArray(chunkData.propietarios)) {
+                    chunkData.propietarios.forEach(prop => {
+                        if (!combinedData.propietarios.some(existing => 
+                            existing.nombre === prop.nombre || existing.curp === prop.curp)) {
+                            combinedData.propietarios.push(prop);
+                        }
+                    });
+                }
+                
+            } catch (error) {
+                console.warn(`⚠️ Error parseando chunk ${chunk.chunkNumber}:`, error);
+            }
+        });
+        
+        console.log(`✅ Resultados combinados de ${successfulChunks.length} chunks exitosos`);
+        
+        return {
+            datos_extraidos: combinedData,
+            timestamp: new Date().toISOString(),
+            document_type: this.currentDocumentType,
+            chunks_info: {
+                total: chunkResults.length,
+                exitosos: successfulChunks.length,
+                fallidos: failedChunks.length,
+                detalles: chunkResults.map(r => ({
+                    chunk: r.chunkNumber,
+                    paginas: `${r.startPage}-${r.endPage}`,
+                    estado: r.success ? 'exitoso' : 'fallido',
+                    error: r.error || null
+                }))
+            },
+            campos_extraidos: this.calculateExtractedFields(combinedData),
+            confianza_global: Math.round((successfulChunks.length / chunkResults.length) * 100)
+        };
     }
     
     // Create extraction prompt based on document type

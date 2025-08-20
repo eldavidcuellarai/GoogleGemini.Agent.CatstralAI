@@ -27,15 +27,12 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Text is required' });
         }
 
-        // Verificar tamaño del payload
-        let processedText = text;
+        // Log del tamaño sin límites
         const textSize = new TextEncoder().encode(text).length;
         console.log(`📊 Tamaño del texto: ${textSize} bytes (${text.length} caracteres)`);
         
-        if (textSize > 1048576) { // 1MB límite
-            console.log('⚠️ Texto muy grande, recortando...');
-            processedText = text.substring(0, 30000) + '\n\n[TEXTO RECORTADO PARA PROCESAR]';
-        }
+        // Usar texto completo sin límites - el chunking se maneja en el frontend
+        const processedText = text;
 
         // Preparar el contenido para Gemini
         const contents = [

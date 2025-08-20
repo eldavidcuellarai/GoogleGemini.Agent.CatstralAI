@@ -9,13 +9,14 @@ spec:
   template:
     metadata:
       annotations:
-        # Aumentar límites para archivos grandes
-        run.googleapis.com/memory: "2Gi"
-        run.googleapis.com/cpu: "2"
-        run.googleapis.com/timeout: "300"
-        run.googleapis.com/max-instances: "10"
-        # Configuración para payloads grandes
+        # Configuración para archivos muy grandes
+        run.googleapis.com/memory: "4Gi"
+        run.googleapis.com/cpu: "4"
+        run.googleapis.com/timeout: "900"
+        run.googleapis.com/max-instances: "20"
         run.googleapis.com/execution-environment: gen2
+        # Configuración para payloads ilimitados
+        run.googleapis.com/cloudsql-instances: ""
     spec:
       containerConcurrency: 100
       timeoutSeconds: 300
@@ -31,8 +32,8 @@ spec:
               key: key
         resources:
           limits:
+            memory: "4Gi"
+            cpu: "4"
+          requests:
             memory: "2Gi"
             cpu: "2"
-          requests:
-            memory: "1Gi"
-            cpu: "1"
