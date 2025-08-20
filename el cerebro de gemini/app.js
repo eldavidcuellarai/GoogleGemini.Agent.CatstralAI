@@ -1,38 +1,22 @@
 class CatastralAnalyzer {
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-    }
     constructor() {
         this.apiKey = '';
         this.systemPrompt = '';
-        this.uploadedFiles = [];
-        this.maxFiles = 10;
-        this.maxTotalSize = 50 * 1024 * 1024; // 50MB
+        this.conversationHistory = [];
         this.maxSingleFile = 20 * 1024 * 1024; // 20MB
-        this.currentDocumentType = 'propiedad'; // Track current document type
-        this.extractedData = null; // Store extracted data
+        this.currentDocumentType = 'propiedad';
+        this.extractedData = null;
+        this.processingFiles = new Map(); // Track processing files
         
-        // Predefined prompts for catastral analysis
-        this.analysisPrompts = {
-            compare: "Analiza y compara estas cartas catastrales, identifica similitudes y diferencias entre las propiedades",
-            extract: "Extrae datos de todas las propiedades y crea una tabla comparativa con superficie, ubicación y características",
-            surface: "Identifica la propiedad con mayor superficie de estos documentos y proporciona detalles",
-            summary: "Resume las características comunes de todas estas propiedades catastrales",
-            inconsistencies: "Detecta inconsistencias o anomalías entre los documentos catastrales proporcionados",
-            ranking: "Proporciona un ranking de propiedades por valor catastral o superficie"
-        };
-        
+        // Initialize immediately
         this.initializeElements();
         this.bindEvents();
+        this.loadConfiguration();
         this.setupPDFJS();
         this.initializeTabs();
-
-        // Initialize Gemini Model
-        this.geminiModel = null;
+        this.initializeFileUpload();
+        this.initializeDocumentTypeSlider();
+        this.initializeChat();
     }
     
     initializeElements() {
@@ -44,36 +28,10 @@ class CatastralAnalyzer {
         this.toggleApiKeyBtn = document.getElementById('toggleApiKey');
         this.themeToggle = document.getElementById('themeToggle');
         
-        // Upload elements
-        this.uploadArea = document.getElementById('uploadAreaCompact');
-        this.fileInput = document.getElementById('fileInputCompact');
-        this.fileGallery = document.getElementById('uploadedFilesList');
-        this.fileList = document.getElementById('uploadedFilesList');
-        this.selectFilesBtn = document.getElementById('selectFilesBtn');
-        
-        // Processing mode elements
-        this.processingModeInputs = document.querySelectorAll('input[name="processingMode"]');
-        
-        // Quick analysis elements
-        this.quickAnalysis = document.getElementById('quickAnalysis');
-        this.analysisButtons = document.querySelectorAll('.analysis-btn');
-        
         // Chat elements
-        this.chatMessages = document.getElementById('chatMessages');
-        this.messageInput = document.getElementById('messageInput');
-        this.sendBtn = document.getElementById('sendMessage');
-        this.processBtn = document.getElementById('processFiles');
-        this.clearChatBtn = document.getElementById('clearChat');
-        this.exportBtn = document.getElementById('exportResults');
-        
-        // New chat elements
         this.chatInput = document.getElementById('chatInput');
         this.sendChatBtn = document.getElementById('sendChatMessage');
-        
-        // Selected files elements
-        this.selectedFilesDiv = document.getElementById('selectedFiles');
-        this.selectedFilesList = document.getElementById('selectedFilesList');
-        this.clearSelectionBtn = document.getElementById('clearSelection');
+        this.chatMessages = document.getElementById('chatMessages');
         
         // Modal elements
         this.loadingModal = document.getElementById('loadingModal');
@@ -85,74 +43,60 @@ class CatastralAnalyzer {
     
     bindEvents() {
         // Configuration events
-        this.saveConfigBtn.addEventListener('click', () => this.saveConfiguration());
-        this.toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility());
+        if (this.saveConfigBtn) {
+            this.saveConfigBtn.addEventListener('click', () => this.saveConfiguration());
+        }
+        
+        if (this.toggleApiKeyBtn) {
+            this.toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility());
+        }
+        
+        if (this.themeToggle) {
+            this.themeToggle.addEventListener('click', () => this.toggleTheme());
+        }
         
         // Upload events
-        this.selectFilesBtn.addEventListener('click', () => this.fileInput.click());
-        this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
-        this.uploadArea.addEventListener('dragover', (e) => this.handleDragOver(e));
-        this.uploadArea.addEventListener('dragleave', (e) => this.handleDragLeave(e));
-        this.uploadArea.addEventListener('drop', (e) => this.handleDrop(e));
+        if (this.selectFilesBtn) {
+            this.selectFilesBtn.addEventListener('click', () => this.fileInput.click());
+        }
         
-        // Processing mode events
-        this.processingModeInputs.forEach(input => {
-            input.addEventListener('change', (e) => {
-                this.processingMode = e.target.value;
-                this.updateSelectedFiles();
-            });
-        });
+        if (this.fileInput) {
+            this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        }
         
-        // Quick analysis events
-        this.analysisButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const promptType = e.currentTarget.getAttribute('data-prompt');
-                this.runQuickAnalysis(promptType);
-            });
-        });
+        if (this.uploadArea) {
+            this.uploadArea.addEventListener('dragover', (e) => this.handleDragOver(e));
+            this.uploadArea.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+            this.uploadArea.addEventListener('drop', (e) => this.handleDrop(e));
+        }
         
-        // Chat events
-        this.sendBtn.addEventListener('click', () => this.sendMessage());
-        this.processBtn.addEventListener('click', () => this.processSelectedFiles());
-        this.clearChatBtn.addEventListener('click', () => this.clearChat());
-        this.exportBtn.addEventListener('click', () => this.showExportModal());
-        this.clearSelectionBtn.addEventListener('click', () => this.clearFileSelection());
+        if (this.processFilesBtn) {
+            this.processFilesBtn.addEventListener('click', () => this.processFiles());
+        }
         
-        // New chat events
-        this.sendChatBtn.addEventListener('click', () => this.sendChatMessage());
-        this.chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.sendChatMessage();
-            }
-        });
+        if (this.clearFilesBtn) {
+            this.clearFilesBtn.addEventListener('click', () => this.clearFiles());
+        }
         
         // Modal events
-        this.closeExportModalBtn.addEventListener('click', () => this.hideExportModal());
+        if (this.closeExportModalBtn) {
+            this.closeExportModalBtn.addEventListener('click', () => this.hideExportModal());
+        }
+        
+        // Export options
         document.querySelectorAll('.export-option').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const format = e.currentTarget.getAttribute('data-format');
+                const format = e.currentTarget.dataset.format;
                 this.exportResults(format);
             });
         });
-        
-        // Keyboard events
-        this.messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.sendMessage();
-            }
-        });
-        
-        // Auto-resize textarea
-        this.messageInput.addEventListener('input', () => this.autoResizeTextarea());
-        this.systemPromptInput.addEventListener('input', () => this.autoResizeTextarea(this.systemPromptInput));
-        this.chatInput.addEventListener('input', () => this.autoResizeChatInput());
     }
     
     setupPDFJS() {
         // Configure PDF.js worker
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
     }
     
     getEnvironmentVariable(name) {
@@ -185,16 +129,20 @@ class CatastralAnalyzer {
             
             if (envApiKey) {
                 this.apiKey = envApiKey;
-                this.apiKeyInput.value = '••••••••••••••••'; // Show masked value
-                this.apiKeyInput.disabled = true;
+                if (this.apiKeyInput) {
+                    this.apiKeyInput.value = '••••••••••••••••'; // Show masked value
+                    this.apiKeyInput.disabled = true;
+                }
                 console.log('Using API key from environment variable');
                 
                 // Load system prompt from localStorage or use default
                 const savedConfig = localStorage.getItem('catastral-analyzer-config');
                 if (savedConfig) {
                     const config = JSON.parse(savedConfig);
-                    this.systemPromptInput.value = config.systemPrompt || this.systemPromptInput.value;
-                    this.systemPrompt = config.systemPrompt || this.systemPromptInput.value;
+                    if (this.systemPromptInput) {
+                        this.systemPromptInput.value = config.systemPrompt || this.systemPromptInput.value;
+                        this.systemPrompt = config.systemPrompt || this.systemPromptInput.value;
+                    }
                 }
                 
                 this.enableInterface();
@@ -206,8 +154,9 @@ class CatastralAnalyzer {
             const savedConfig = localStorage.getItem('catastral-analyzer-config');
             if (savedConfig) {
                 const config = JSON.parse(savedConfig);
-                this.apiKeyInput.value = config.apiKey || '';
-                this.systemPromptInput.value = config.systemPrompt || this.systemPromptInput.value;
+                
+                if (this.apiKeyInput) this.apiKeyInput.value = config.apiKey || '';
+                if (this.systemPromptInput) this.systemPromptInput.value = config.systemPrompt || this.systemPromptInput.value;
                 
                 if (config.apiKey && config.systemPrompt) {
                     this.apiKey = config.apiKey;
@@ -228,22 +177,21 @@ class CatastralAnalyzer {
     }
     
     saveConfiguration() {
+        if (!this.systemPromptInput) {
+            this.showError('Elementos de configuración no encontrados');
+            return;
+        }
+        
         const systemPrompt = this.systemPromptInput.value.trim();
         
         // Check if API key is already loaded from environment
-        if (this.apiKeyInput.disabled && this.apiKey) {
+        if (this.apiKeyInput && this.apiKeyInput.disabled && this.apiKey) {
             // API key comes from environment, only save system prompt
-            if (!systemPrompt) {
-                this.showError('Por favor define un System Prompt');
-                this.systemPromptInput.focus();
-                return;
-            }
-            
             this.systemPrompt = systemPrompt;
             
             // Save only system prompt to localStorage
             try {
-                const currentTheme = document.documentElement.getAttribute('data-color-scheme');
+                const currentTheme = document.documentElement.getAttribute('data-color-scheme') || 'light';
                 const existingConfig = JSON.parse(localStorage.getItem('catastral-analyzer-config') || '{}');
                 localStorage.setItem('catastral-analyzer-config', JSON.stringify({
                     ...existingConfig,
@@ -256,22 +204,20 @@ class CatastralAnalyzer {
             
             this.enableInterface();
             this.showConfigStatus(true, '✓ System Prompt guardado (API Key desde variables de entorno)');
-            this.clearWelcomeMessage();
+            console.log('✅ System Prompt guardado con API Key desde entorno');
             return;
         }
         
         // Manual API key configuration
+        if (!this.apiKeyInput) {
+            this.showError('Elementos de configuración no encontrados');
+            return;
+        }
+        
         const apiKey = this.apiKeyInput.value.trim();
         
         if (!apiKey) {
             this.showError('Por favor ingresa tu API Key de Gemini o configúrala como variable de entorno');
-            this.apiKeyInput.focus();
-            return;
-        }
-        
-        if (!systemPrompt) {
-            this.showError('Por favor define un System Prompt');
-            this.systemPromptInput.focus();
             return;
         }
         
@@ -279,53 +225,76 @@ class CatastralAnalyzer {
         this.systemPrompt = systemPrompt;
         
         // Save to localStorage
-        try {
-            const currentTheme = document.documentElement.getAttribute('data-color-scheme');
-            localStorage.setItem('catastral-analyzer-config', JSON.stringify({
-                apiKey: apiKey,
-                systemPrompt: systemPrompt,
-                theme: currentTheme
-            }));
-        } catch (error) {
-            console.warn('Error saving configuration:', error);
-        }
+        const config = {
+            apiKey: this.apiKey,
+            systemPrompt: this.systemPrompt,
+            theme: document.documentElement.getAttribute('data-color-scheme') || 'light'
+        };
+        
+        localStorage.setItem('catastral-analyzer-config', JSON.stringify(config));
         
         this.enableInterface();
         this.showConfigStatus(true);
-        this.clearWelcomeMessage();
+        
+        console.log('✅ Configuración guardada');
     }
     
     enableInterface() {
-        this.messageInput.disabled = false;
-        this.sendBtn.disabled = false;
-        this.processBtn.disabled = this.selectedFiles.length === 0;
-        this.clearChatBtn.disabled = false;
-        this.messageInput.placeholder = "Pregunta sobre tus documentos catastrales...";
+        // Enable chat input
+        if (this.chatInput) {
+            this.chatInput.disabled = false;
+            this.chatInput.placeholder = "Pregunta sobre los datos extraídos o sube un documento...";
+        }
         
-        // Enable new chat input
-        this.chatInput.disabled = false;
-        this.sendChatBtn.disabled = false;
-        this.chatInput.placeholder = "Pregunta sobre los datos extraídos...";
+        if (this.sendChatBtn) {
+            this.sendChatBtn.disabled = false;
+        }
         
-        // Enable analysis buttons if files are uploaded
-        if (this.uploadedFiles.length > 0) {
-            this.analysisButtons.forEach(btn => btn.disabled = false);
+        // Update connection status
+        const connectionStatus = document.getElementById('connectionStatus');
+        if (connectionStatus) {
+            const indicator = connectionStatus.querySelector('.status-indicator');
+            const statusText = connectionStatus.querySelector('.status-text');
+            
+            if (indicator) indicator.className = 'status-indicator online';
+            if (statusText) statusText.textContent = 'Configurado';
         }
     }
     
-    toggleApiKeyVisibility() {
-        const input = this.apiKeyInput;
-        const showText = this.toggleApiKeyBtn.querySelector('.show-text');
-        const hideText = this.toggleApiKeyBtn.querySelector('.hide-text');
+    showConfigStatus(success, message = '') {
+        if (!this.configStatus) return;
         
-        if (input.type === 'password') {
-            input.type = 'text';
-            showText.classList.add('hidden');
-            hideText.classList.remove('hidden');
+        this.configStatus.classList.remove('hidden');
+        const statusText = this.configStatus.querySelector('.status-text');
+        const statusIcon = this.configStatus.querySelector('.status-icon');
+        
+        if (success) {
+            if (statusText) statusText.textContent = message || 'Configuración guardada correctamente';
+            if (statusIcon) statusIcon.textContent = '✅';
+            this.configStatus.classList.add('success');
+            this.configStatus.classList.remove('error');
         } else {
-            input.type = 'password';
-            showText.classList.remove('hidden');
-            hideText.classList.add('hidden');
+            if (statusText) statusText.textContent = message || 'Error en la configuración';
+            if (statusIcon) statusIcon.textContent = '❌';
+            this.configStatus.classList.add('error');
+            this.configStatus.classList.remove('success');
+        }
+        
+        // Hide after 3 seconds
+        setTimeout(() => {
+            this.configStatus.classList.add('hidden');
+        }, 3000);
+    }
+    
+    toggleApiKeyVisibility() {
+        if (!this.apiKeyInput || !this.toggleApiKeyBtn) return;
+        
+        const isPassword = this.apiKeyInput.type === 'password';
+        this.apiKeyInput.type = isPassword ? 'text' : 'password';
+        
+        const icon = this.toggleApiKeyBtn.querySelector('.show-text');
+        if (icon) {
+            icon.textContent = isPassword ? '🙈' : '👁️';
         }
     }
     
@@ -337,965 +306,27 @@ class CatastralAnalyzer {
         this.updateThemeButton(newTheme);
         
         // Save theme preference
-        try {
-            const savedConfig = JSON.parse(localStorage.getItem('catastral-analyzer-config') || '{}');
-            savedConfig.theme = newTheme;
-            localStorage.setItem('catastral-analyzer-config', JSON.stringify(savedConfig));
-        } catch (error) {
-            console.warn('Error saving theme preference:', error);
+        const savedConfig = localStorage.getItem('catastral-analyzer-config');
+        if (savedConfig) {
+            const config = JSON.parse(savedConfig);
+            config.theme = newTheme;
+            localStorage.setItem('catastral-analyzer-config', JSON.stringify(config));
         }
     }
     
     updateThemeButton(theme) {
-        this.themeToggle.textContent = theme === 'dark' ? '☀️ Tema' : '🌙 Tema';
-    }
-    
-    showConfigStatus(success, message = null) {
-        this.configStatus.classList.remove('hidden');
-        const statusDiv = this.configStatus.querySelector('.status');
+        if (!this.themeToggle) return;
         
-        if (success) {
-            statusDiv.className = 'status status--success';
-            statusDiv.textContent = message || '✓ Configuración guardada correctamente';
+        const icon = this.themeToggle.querySelector('.theme-icon');
+        const text = this.themeToggle.querySelector('.theme-text');
+        
+        if (theme === 'dark') {
+            if (icon) icon.textContent = '☀️';
+            if (text) text.textContent = 'Claro';
         } else {
-            statusDiv.className = 'status status--error';
-            statusDiv.textContent = message || '✗ Error en la configuración';
+            if (icon) icon.textContent = '🌙';
+            if (text) text.textContent = 'Oscuro';
         }
-        
-        setTimeout(() => {
-            this.configStatus.classList.add('hidden');
-        }, 3000);
-    }
-    
-    clearWelcomeMessage() {
-        const welcomeMessage = this.chatMessages.querySelector('.welcome-message');
-        if (welcomeMessage) {
-            welcomeMessage.remove();
-        }
-    }
-    
-    // File handling methods
-    handleDragOver(e) {
-        e.preventDefault();
-        this.uploadArea.classList.add('drag-over');
-    }
-    
-    handleDragLeave(e) {
-        e.preventDefault();
-        this.uploadArea.classList.remove('drag-over');
-    }
-    
-    handleDrop(e) {
-        e.preventDefault();
-        this.uploadArea.classList.remove('drag-over');
-        
-        const files = Array.from(e.dataTransfer.files);
-        this.processFiles(files);
-    }
-    
-    handleFileSelect(e) {
-        const files = Array.from(e.target.files);
-        this.processFiles(files);
-        e.target.value = ''; // Reset input
-    }
-    
-    async processFiles(files) {
-        // Validate file count
-        if (this.uploadedFiles.length + files.length > this.maxFiles) {
-            this.showError(`Máximo ${this.maxFiles} archivos permitidos. Actualmente tienes ${this.uploadedFiles.length} archivos.`);
-            return;
-        }
-        
-        // Validate total size
-        const currentSize = this.uploadedFiles.reduce((total, file) => total + file.size, 0);
-        const newFilesSize = files.reduce((total, file) => total + file.size, 0);
-        
-        if (currentSize + newFilesSize > this.maxTotalSize) {
-            this.showError('El tamaño total de archivos excede el límite de 50MB.');
-            return;
-        }
-        
-        // Process each file
-        for (const file of files) {
-            await this.addFile(file);
-        }
-        
-        this.updateFileGallery();
-        this.showQuickAnalysis();
-    }
-    
-    async addFile(file) {
-        // Validate file type
-        const validTypes = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
-        if (!validTypes.includes(file.type)) {
-            this.showError(`Formato no soportado: ${file.name}. Usa PNG, JPEG, WebP o PDF.`);
-            return;
-        }
-        
-        // Validate file size
-        if (file.size > this.maxSingleFile) {
-            this.showError(`Archivo demasiado grande: ${file.name}. Máximo 20MB por archivo.`);
-            return;
-        }
-        
-        const fileData = {
-            id: Date.now() + Math.random(),
-            file: file,
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            preview: null,
-            data: null,
-            processed: false,
-            selected: false
-        };
-        
-        // Generate preview
-        if (file.type.startsWith('image/')) {
-            fileData.preview = await this.generateImagePreview(file);
-            fileData.data = await this.fileToBase64(file);
-        } else if (file.type === 'application/pdf') {
-            const { preview, images } = await this.processPDF(file);
-            fileData.preview = preview;
-            fileData.data = images; // Array of base64 images
-        }
-        
-        this.uploadedFiles.push(fileData);
-    }
-    
-    async generateImagePreview(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.readAsDataURL(file);
-        });
-    }
-    
-    async fileToBase64(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const base64 = e.target.result.split(',')[1];
-                resolve(base64);
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-    
-    async processPDF(file) {
-        try {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            
-            const images = [];
-            const numPages = Math.min(pdf.numPages, 5); // Limit to first 5 pages
-            
-            // Process first page for preview
-            const page = await pdf.getPage(1);
-            const scale = 1.5;
-            const viewport = page.getViewport({ scale });
-            
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            
-            await page.render({
-                canvasContext: context,
-                viewport: viewport
-            }).promise;
-            
-            const preview = canvas.toDataURL();
-            
-            // Process all pages for analysis
-            for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-                const page = await pdf.getPage(pageNum);
-                const viewport = page.getViewport({ scale: 2.0 });
-                
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-                
-                await page.render({
-                    canvasContext: context,
-                    viewport: viewport
-                }).promise;
-                
-                const imageData = canvas.toDataURL().split(',')[1];
-                images.push(imageData);
-            }
-            
-            return { preview, images };
-        } catch (error) {
-            console.error('Error processing PDF:', error);
-            this.showError(`Error procesando PDF: ${file.name}`);
-            return { preview: null, images: [] };
-        }
-    }
-    
-    updateFileGallery() {
-        if (this.uploadedFiles.length === 0) {
-            this.fileGallery.classList.add('hidden');
-            this.quickAnalysis.classList.add('hidden');
-            return;
-        }
-        
-        this.fileGallery.classList.remove('hidden');
-        this.fileCount.textContent = this.uploadedFiles.length;
-        
-        this.fileList.innerHTML = '';
-        const sortedFiles = this.getSortedFiles();
-        
-        sortedFiles.forEach(fileData => {
-            const fileElement = this.createFileElement(fileData);
-            this.fileList.appendChild(fileElement);
-        });
-        
-        this.updateProcessButton();
-    }
-    
-    getSortedFiles() {
-        const sortBy = this.sortFiles.value;
-        return [...this.uploadedFiles].sort((a, b) => {
-            switch (sortBy) {
-                case 'name':
-                    return a.name.localeCompare(b.name);
-                case 'size':
-                    return b.size - a.size;
-                case 'type':
-                    return a.type.localeCompare(b.type);
-                default:
-                    return 0;
-            }
-        });
-    }
-    
-    createFileElement(fileData) {
-        const div = document.createElement('div');
-        div.className = 'file-item';
-        div.setAttribute('data-file-id', fileData.id);
-        
-        const previewIcon = fileData.type === 'application/pdf' ? '📄' : '🖼️';
-        const sizeText = this.formatFileSize(fileData.size);
-        
-        div.innerHTML = `
-            <div class="file-preview">
-                ${fileData.preview 
-                    ? `<img src="${fileData.preview}" alt="Preview" style="max-width: 100%; max-height: 100px; object-fit: contain;">`
-                    : `<div class="file-preview-icon">${previewIcon}</div>`
-                }
-            </div>
-            <div class="file-info">
-                <div class="file-name" title="${fileData.name}">${fileData.name}</div>
-                <div class="file-meta">
-                    <span>${fileData.type.split('/')[1].toUpperCase()}</span>
-                    <span>${sizeText}</span>
-                </div>
-                <button class="btn btn--outline btn--sm delete-file" title="Eliminar">
-                    <span>🗑️</span>
-                </button>
-            </div>
-        `;
-        
-        // Bind events
-        const checkbox = div.querySelector('.file-checkbox');
-        const previewBtn = div.querySelector('.preview');
-        const deleteBtn = div.querySelector('.delete');
-        
-        checkbox.addEventListener('change', () => this.toggleFileSelection(fileData.id));
-        div.addEventListener('click', (e) => {
-            if (e.target !== checkbox && e.target !== previewBtn && e.target !== deleteBtn) {
-                checkbox.checked = !checkbox.checked;
-                this.toggleFileSelection(fileData.id);
-            }
-        });
-        
-        previewBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.showFilePreview(fileData);
-        });
-        
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.removeFile(fileData.id);
-        });
-        
-        return div;
-    }
-    
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-    
-    toggleFileSelection(fileId) {
-        const fileData = this.uploadedFiles.find(f => f.id === fileId);
-        if (!fileData) return;
-        
-        fileData.selected = !fileData.selected;
-        
-        // Update selected files list
-        if (fileData.selected) {
-            if (!this.selectedFiles.find(f => f.id === fileId)) {
-                this.selectedFiles.push(fileData);
-            }
-        } else {
-            this.selectedFiles = this.selectedFiles.filter(f => f.id !== fileId);
-        }
-        
-        this.updateFileGallery();
-        this.updateSelectedFiles();
-        this.updateProcessButton();
-    }
-    
-    selectAllFiles() {
-        this.uploadedFiles.forEach(fileData => {
-            fileData.selected = true;
-        });
-        this.selectedFiles = [...this.uploadedFiles];
-        this.updateFileGallery();
-        this.updateSelectedFiles();
-        this.updateProcessButton();
-    }
-    
-    clearAllFiles() {
-        if (confirm('¿Estás seguro de que quieres eliminar todos los archivos?')) {
-            this.uploadedFiles = [];
-            this.selectedFiles = [];
-            this.updateFileGallery();
-            this.updateSelectedFiles();
-            this.updateProcessButton();
-        }
-    }
-    
-    removeFile(fileId) {
-        this.uploadedFiles = this.uploadedFiles.filter(f => f.id !== fileId);
-        this.selectedFiles = this.selectedFiles.filter(f => f.id !== fileId);
-        this.updateFileGallery();
-        this.updateSelectedFiles();
-        this.updateProcessButton();
-    }
-    
-    sortFileList() {
-        this.updateFileGallery();
-    }
-    
-    showFilePreview(fileData) {
-        // Simple preview - in a real app, you might want a proper modal
-        if (fileData.preview) {
-            window.open(fileData.preview, '_blank');
-        }
-    }
-    
-    updateSelectedFiles() {
-        if (this.selectedFiles.length === 0) {
-            this.selectedFilesDiv.style.display = 'none';
-            return;
-        }
-        
-        this.selectedFilesDiv.style.display = 'block';
-        this.selectedFilesList.innerHTML = '';
-        
-        this.selectedFiles.forEach(fileData => {
-            const badge = document.createElement('div');
-            badge.className = 'selected-file-badge';
-            badge.innerHTML = `
-                ${fileData.name}
-                <span onclick="window.analyzer.deselectFile('${fileData.id}')" style="cursor: pointer; margin-left: 4px;">×</span>
-            `;
-            this.selectedFilesList.appendChild(badge);
-        });
-    }
-    
-    deselectFile(fileId) {
-        const fileData = this.uploadedFiles.find(f => f.id == fileId);
-        if (fileData) {
-            fileData.selected = false;
-            this.selectedFiles = this.selectedFiles.filter(f => f.id != fileId);
-            this.updateFileGallery();
-            this.updateSelectedFiles();
-            this.updateProcessButton();
-        }
-    }
-    
-    clearFileSelection() {
-        this.uploadedFiles.forEach(fileData => {
-            fileData.selected = false;
-        });
-        this.selectedFiles = [];
-        this.updateFileGallery();
-        this.updateSelectedFiles();
-        this.updateProcessButton();
-    }
-    
-    updateProcessButton() {
-        this.processBtn.disabled = this.selectedFiles.length === 0 || !this.apiKey;
-    }
-    
-    showQuickAnalysis() {
-        if (this.uploadedFiles.length > 0) {
-            this.quickAnalysis.classList.remove('hidden');
-        }
-    }
-    
-    // Analysis methods
-    async runQuickAnalysis(promptType) {
-        if (!this.apiKey || this.uploadedFiles.length === 0) {
-            this.showError('Configura tu API key y carga archivos primero.');
-            return;
-        }
-        
-        // Select all files for quick analysis
-        this.selectAllFiles();
-        
-        const prompt = this.analysisPrompts[promptType];
-        if (prompt) {
-            this.messageInput.value = prompt;
-            await this.processSelectedFiles();
-        }
-    }
-    
-    async processSelectedFiles() {
-        if (this.selectedFiles.length === 0) {
-            this.showError('Selecciona archivos para procesar.');
-            return;
-        }
-        
-        const message = this.messageInput.value.trim() || 'Analiza estos documentos catastrales.';
-        
-        // Add user message with file info
-        this.addMessageToChat('user', message, this.selectedFiles);
-        
-        // Clear input
-        this.messageInput.value = '';
-        this.autoResizeTextarea();
-        
-        // Show loading
-        this.showLoading(true);
-        this.updateLoadingProgress(0);
-        this.loadingText.textContent = 'Procesando documentos...';
-        
-        try {
-            let response;
-            
-            if (this.processingMode === 'sequential') {
-                response = await this.processSequential(message);
-            } else if (this.processingMode === 'batch') {
-                response = await this.processBatch(message);
-            } else {
-                response = await this.processSelective(message);
-            }
-            
-            this.addMessageToChat('bot', response);
-            this.exportBtn.disabled = false;
-        } catch (error) {
-            console.error('Error processing files:', error);
-            this.addMessageToChat('bot', `Error: ${error.message}`);
-        }
-        
-        this.showLoading(false);
-        this.clearFileSelection();
-    }
-    
-    async processSequential(message) {
-        let combinedResponse = '';
-        const totalFiles = this.selectedFiles.length;
-        
-        for (let i = 0; i < totalFiles; i++) {
-            const fileData = this.selectedFiles[i];
-            this.updateLoadingProgress((i / totalFiles) * 100);
-            this.loadingText.textContent = `Procesando ${fileData.name}...`;
-            
-            const fileMessage = `Documento ${i + 1}/${totalFiles}: ${fileData.name}\n\n${message}`;
-            const response = await this.callGeminiAPI(fileMessage, fileData);
-            
-            combinedResponse += `\n\n--- Análisis de ${fileData.name} ---\n${response}`;
-        }
-        
-        return `Análisis secuencial completado:${combinedResponse}`;
-    }
-    
-    async processBatch(message) {
-        this.loadingText.textContent = 'Procesando todos los archivos simultáneamente...';
-        this.updateLoadingProgress(50);
-        
-        const batchMessage = `Analiza comparativamente estos ${this.selectedFiles.length} documentos catastrales:\n\n${message}`;
-        return await this.callGeminiAPI(batchMessage, this.selectedFiles);
-    }
-    
-    async processSelective(message) {
-        // Similar to batch but with specific selection logic
-        return await this.processBatch(message);
-    }
-    
-    async sendMessage() {
-        const message = this.messageInput.value.trim();
-        if (!message) return;
-        
-        if (!this.apiKey) {
-            this.showError('Configura tu API key primero.');
-            return;
-        }
-        
-        // Add user message
-        this.addMessageToChat('user', message);
-        
-        // Clear input
-        this.messageInput.value = '';
-        this.autoResizeTextarea();
-        
-        // Show loading
-        this.showLoading(true);
-        
-        try {
-            const response = await this.callGeminiAPI(message);
-            this.addMessageToChat('bot', response);
-        } catch (error) {
-            console.error('Error sending message:', error);
-            this.addMessageToChat('bot', `Error: ${error.message}`);
-        }
-        
-        this.showLoading(false);
-    }
-    
-    async sendChatMessage() {
-        const message = this.chatInput.value.trim();
-        if (!message) return;
-        
-        if (!this.apiKey) {
-            this.showError('Configura tu API key primero.');
-            return;
-        }
-        
-        // Add user message to chat
-        this.addChatMessage('user', message);
-        
-        // Clear input
-        this.chatInput.value = '';
-        this.autoResizeChatInput();
-        
-        // Show loading
-        this.showChatLoading(true);
-        
-        try {
-            const response = await this.callChatWithGemini(message);
-            this.addChatMessage('bot', response);
-        } catch (error) {
-            console.error('Error sending chat message:', error);
-            this.addChatMessage('bot', `Error: ${error.message}`);
-        }
-        
-        this.showChatLoading(false);
-    }
-    
-    async callChatWithGemini(message) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${this.apiKey}`;
-        
-        // Prepare conversation context with extracted data
-        let contextPrompt = `Eres un asistente experto en análisis de documentos notariales mexicanos especializado en documentos de propiedad y gravamen.
-Tu trabajo es ayudar al usuario a entender y analizar los datos extraídos de documentos.
-
-Responde de manera clara, profesional y útil. Si el usuario pregunta sobre campos específicos, explica su significado legal y relevancia.
-Mantén un tono amigable pero profesional. Responde en español.
-
-IMPORTANTE: No respondas con JSON, responde con texto natural conversacional.`;
-
-        // Add context from extracted data if available
-        if (this.extractedData && Object.keys(this.extractedData).length > 0) {
-            contextPrompt += `\n\nDATOS EXTRAÍDOS DEL DOCUMENTO ACTUAL:\n${JSON.stringify(this.extractedData, null, 2)}`;
-            contextPrompt += `\n\nEl usuario puede preguntarte sobre cualquier aspecto de estos datos extraídos.`;
-        } else {
-            contextPrompt += `\n\nActualmente no hay datos extraídos disponibles. El usuario puede estar preguntando sobre el proceso de extracción o documentos en general.`;
-        }
-        
-        const contents = [];
-        
-        // Add system context
-        contents.push({
-            role: 'user',
-            parts: [{ text: contextPrompt }]
-        });
-        contents.push({
-            role: 'model',
-            parts: [{ text: 'Entendido. Actuaré como un experto analista de documentos notariales según las instrucciones proporcionadas. Estoy listo para ayudarte con preguntas sobre los datos extraídos.' }]
-        });
-        
-        // Add current message
-        contents.push({
-            role: 'user',
-            parts: [{ text: message }]
-        });
-        
-        const requestBody = {
-            contents: contents,
-            generationConfig: {
-                temperature: 0.7, // More creative for conversation
-                topP: 0.8,
-                topK: 40,
-                maxOutputTokens: 1000
-            }
-        };
-        
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody)
-        });
-        
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status} - ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        if (!data.candidates || data.candidates.length === 0) {
-            throw new Error('No se recibió respuesta válida del modelo');
-        }
-        
-        return data.candidates[0].content.parts[0].text;
-    }
-    
-    async callGeminiAPI(message, files = null) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${this.apiKey}`;
-        
-        // Prepare conversation history
-        const contents = [];
-        
-        // Add system prompt as first message
-        contents.push({
-            role: 'user',
-            parts: [{ text: this.systemPrompt }]
-        });
-        contents.push({
-            role: 'model',
-            parts: [{ text: 'Entendido. Actuaré como un experto analista de documentos catastrales según las instrucciones proporcionadas.' }]
-        });
-        
-        // Add conversation history
-        this.conversationHistory.forEach(entry => {
-            contents.push({
-                role: entry.role === 'user' ? 'user' : 'model',
-                parts: entry.parts
-            });
-        });
-        
-        // Prepare current message parts
-        const currentParts = [];
-        if (message) {
-            currentParts.push({ text: message });
-        }
-        
-        // Add files to current message
-        if (files) {
-            const fileArray = Array.isArray(files) ? files : [files];
-            
-            fileArray.forEach(fileData => {
-                if (fileData.type.startsWith('image/')) {
-                    currentParts.push({
-                        inlineData: {
-                            mimeType: fileData.type,
-                            data: fileData.data
-                        }
-                    });
-                } else if (fileData.type === 'application/pdf' && fileData.data) {
-                    // Add all PDF pages as images
-                    fileData.data.forEach((imageData, index) => {
-                        currentParts.push({
-                            inlineData: {
-                                mimeType: 'image/png',
-                                data: imageData
-                            }
-                        });
-                    });
-                }
-            });
-        }
-        
-        // Add current message
-        contents.push({
-            role: 'user',
-            parts: currentParts
-        });
-        
-        const requestBody = {
-            contents: contents,
-            generationConfig: {
-                temperature: 0.3,
-                topP: 0.8,
-                topK: 40,
-                maxOutputTokens: 8192
-            }
-        };
-        
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody)
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-            throw new Error('Respuesta inválida de la API de Gemini');
-        }
-        
-        const botResponse = data.candidates[0].content.parts[0].text;
-        
-        // Update conversation history
-        this.conversationHistory.push({
-            role: 'user',
-            parts: currentParts
-        });
-        
-        this.conversationHistory.push({
-            role: 'model',
-            parts: [{ text: botResponse }]
-        });
-        
-        return botResponse;
-    }
-    
-    addMessageToChat(sender, message, files = null) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message message--${sender}`;
-        
-        const bubble = document.createElement('div');
-        bubble.className = `message-bubble message-bubble--${sender}`;
-        
-        // Add file badges for user messages
-        if (files && sender === 'user') {
-            const fileArray = Array.isArray(files) ? files : [files];
-            const filesDiv = document.createElement('div');
-            filesDiv.className = 'message-files';
-            
-            fileArray.forEach(fileData => {
-                const badge = document.createElement('div');
-                badge.className = 'message-file-badge';
-                badge.textContent = fileData.name;
-                filesDiv.appendChild(badge);
-            });
-            
-            bubble.appendChild(filesDiv);
-        }
-        
-        if (message) {
-            const textDiv = document.createElement('div');
-            textDiv.textContent = message;
-            bubble.appendChild(textDiv);
-        }
-        
-        const timestamp = document.createElement('div');
-        timestamp.className = 'message-timestamp';
-        timestamp.textContent = new Date().toLocaleTimeString();
-        bubble.appendChild(timestamp);
-        
-        messageDiv.appendChild(bubble);
-        this.chatMessages.appendChild(messageDiv);
-        
-        // Scroll to bottom
-        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
-    }
-    
-    clearChat() {
-        if (confirm('¿Estás seguro de que quieres limpiar todo el chat?')) {
-            this.chatMessages.innerHTML = '';
-            this.conversationHistory = [];
-            this.exportBtn.disabled = true;
-        }
-    }
-    
-    // Loading and progress methods
-    showLoading(show) {
-        if (show) {
-            this.loadingModal.classList.remove('hidden');
-        } else {
-            this.loadingModal.classList.add('hidden');
-            this.updateLoadingProgress(0);
-        }
-    }
-    
-    updateLoadingProgress(percentage) {
-        this.progressFill.style.width = `${percentage}%`;
-    }
-    
-    // Export methods
-    showExportModal() {
-        this.exportModal.classList.remove('hidden');
-    }
-    
-    hideExportModal() {
-        this.exportModal.classList.add('hidden');
-    }
-    
-    exportResults(format) {
-        const messages = Array.from(this.chatMessages.querySelectorAll('.message--bot'));
-        let content = '';
-        
-        messages.forEach(message => {
-            const text = message.querySelector('.message-bubble').textContent;
-            content += text + '\n\n';
-        });
-        
-        if (!content.trim()) {
-            this.showError('No hay resultados para exportar.');
-            return;
-        }
-        
-        let filename = '';
-        let mimeType = '';
-        
-        switch (format) {
-            case 'json':
-                const jsonData = {
-                    timestamp: new Date().toISOString(),
-                    analysis: content,
-                    files: this.uploadedFiles.map(f => ({
-                        name: f.name,
-                        type: f.type,
-                        size: f.size
-                    }))
-                };
-                content = JSON.stringify(jsonData, null, 2);
-                filename = 'analisis_catastral.json';
-                mimeType = 'application/json';
-                break;
-            case 'csv':
-                // Simple CSV export - in a real app, you'd parse structured data
-                content = 'Timestamp,Analysis\n' + `"${new Date().toISOString()}","${content.replace(/"/g, '""')}"`;
-                filename = 'analisis_catastral.csv';
-                mimeType = 'text/csv';
-                break;
-            case 'summary':
-                filename = 'resumen_catastral.txt';
-                mimeType = 'text/plain';
-                break;
-        }
-        
-        // Create and download file
-        const blob = new Blob([content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        this.hideExportModal();
-    }
-    
-    // Utility methods
-    showError(message) {
-        // Remove existing error messages
-        const existingErrors = document.querySelectorAll('.error-message');
-        existingErrors.forEach(error => error.remove());
-        
-        // Create new error message
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-        
-        // Add to config section
-        this.configStatus.parentNode.insertBefore(errorDiv, this.configStatus.nextSibling);
-        
-        // Remove after 5 seconds
-        setTimeout(() => {
-            if (errorDiv.parentNode) {
-                errorDiv.remove();
-            }
-        }, 5000);
-    }
-    
-    autoResizeTextarea(textarea = null) {
-        const element = textarea || this.messageInput;
-        element.style.height = 'auto';
-        element.style.height = Math.min(element.scrollHeight, 150) + 'px';
-    }
-    
-    // Chat-specific helper functions
-    autoResizeChatInput() {
-        this.chatInput.style.height = 'auto';
-        this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 120) + 'px';
-    }
-    
-    showChatLoading(show) {
-        if (show) {
-            const loadingMsg = this.createChatMessage('bot', '');
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'chat-loading';
-            loadingDiv.innerHTML = `
-                <div class="loading-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </div>
-            `;
-            loadingMsg.appendChild(loadingDiv);
-            this.chatMessages.appendChild(loadingMsg);
-            this.scrollChatToBottom();
-        } else {
-            const loadingMsg = this.chatMessages.querySelector('.chat-loading');
-            if (loadingMsg) {
-                loadingMsg.parentElement.remove();
-            }
-        }
-    }
-    
-    addChatMessage(sender, message) {
-        // Clear welcome message if it exists
-        this.clearWelcomeMessage();
-        
-        const messageDiv = this.createChatMessage(sender, message);
-        this.chatMessages.appendChild(messageDiv);
-        this.scrollChatToBottom();
-    }
-    
-    createChatMessage(sender, message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `chat-message chat-message--${sender}`;
-        
-        const bubble = document.createElement('div');
-        bubble.className = `message-bubble message-bubble--${sender}`;
-        
-        if (message) {
-            const textDiv = document.createElement('div');
-            textDiv.className = 'message-text';
-            textDiv.innerHTML = this.formatMessageText(message);
-            bubble.appendChild(textDiv);
-        }
-        
-        const timestamp = document.createElement('div');
-        timestamp.className = 'message-timestamp';
-        timestamp.textContent = new Date().toLocaleTimeString('es-ES', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
-        bubble.appendChild(timestamp);
-        
-        messageDiv.appendChild(bubble);
-        return messageDiv;
-    }
-    
-    formatMessageText(text) {
-        // Convert line breaks to HTML
-        return text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    }
-    
-    scrollChatToBottom() {
-        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
     }
     
     // Initialize file upload functionality
@@ -1316,7 +347,9 @@ IMPORTANTE: No respondas con JSON, responde con texto natural conversacional.`;
         
         // File input change handler
         fileInput.addEventListener('change', (e) => {
-            this.handleFiles(e.target.files);
+            if (e.target.files.length > 0) {
+                this.handleFiles(e.target.files);
+            }
         });
         
         // Drag and drop handlers
@@ -1332,7 +365,9 @@ IMPORTANTE: No respondas con JSON, responde con texto natural conversacional.`;
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('drag-over');
-            this.handleFiles(e.dataTransfer.files);
+            if (e.dataTransfer.files.length > 0) {
+                this.handleFiles(e.dataTransfer.files);
+            }
         });
         
         console.log('✅ Funcionalidad de upload inicializada');
@@ -1368,24 +403,18 @@ IMPORTANTE: No respondas con JSON, responde con texto natural conversacional.`;
         const uploadSectionTitle = document.getElementById('uploadSectionTitle');
         const uploadTitle = document.getElementById('uploadTitle');
         const uploadedFilesTitle = document.getElementById('uploadedFilesTitle');
-        const panelHeader = document.querySelector('.panel-right .panel-header h3');
         
         if (type === 'propiedad') {
-            uploadSectionTitle.textContent = 'Documentos de Propiedad';
-            uploadTitle.textContent = 'Carga de Documentos de Propiedad';
-            uploadedFilesTitle.textContent = 'Archivos Subidos (Propiedad)';
-            panelHeader.textContent = 'Datos Extraídos (Propiedad)';
+            if (uploadSectionTitle) uploadSectionTitle.textContent = 'Documentos de Propiedad';
+            if (uploadTitle) uploadTitle.textContent = 'Carga de Documentos de Propiedad';
+            if (uploadedFilesTitle) uploadedFilesTitle.textContent = 'Archivos Procesados (Propiedad)';
         } else {
-            uploadSectionTitle.textContent = 'Documentos de Gravamen';
-            uploadTitle.textContent = 'Carga de Documentos de Gravamen';
-            uploadedFilesTitle.textContent = 'Archivos Subidos (Gravamen)';
-            panelHeader.textContent = 'Datos Extraídos (Gravamen)';
+            if (uploadSectionTitle) uploadSectionTitle.textContent = 'Documentos de Gravamen';
+            if (uploadTitle) uploadTitle.textContent = 'Carga de Documentos de Gravamen';
+            if (uploadedFilesTitle) uploadedFilesTitle.textContent = 'Archivos Procesados (Gravamen)';
         }
         
-        // Show/hide relevant cards based on document type
-        this.updateVisibleCards();
-        
-        // Clear current data and files for the new type
+        // Clear previous data and files
         this.clearExtractedData();
         this.clearUploadedFiles();
         
@@ -1394,6 +423,11 @@ IMPORTANTE: No respondas con JSON, responde con texto natural conversacional.`;
     
     // Handle file upload
     async handleFiles(files) {
+        if (!this.apiKey) {
+            this.showError('Por favor configura tu API Key primero');
+            return;
+        }
+        
         console.log(`📁 Procesando ${files.length} archivo(s)...`);
         
         for (let i = 0; i < files.length; i++) {
@@ -1414,12 +448,16 @@ IMPORTANTE: No respondas con JSON, responde con texto natural conversacional.`;
                 if (extractedData) {
                     fileItem.setStatus('completed', 'Completado');
                     this.displayExtractedData(extractedData);
+                    
+                    // Add success message to chat
+                    this.addChatMessage('system', `✅ Documento "${file.name}" procesado correctamente. Los datos han sido extraídos y están disponibles en la pestaña de Tablas.`);
                 } else {
                     fileItem.setStatus('error', 'Error en procesamiento');
                 }
             } catch (error) {
                 console.error('Error procesando archivo:', error);
                 fileItem.setStatus('error', error.message || 'Error desconocido');
+                this.showError(`Error procesando ${file.name}: ${error.message}`);
             }
         }
     }
@@ -1429,12 +467,12 @@ IMPORTANTE: No respondas con JSON, responde con texto natural conversacional.`;
         const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
         
         if (!allowedTypes.includes(file.type)) {
-            this.showError(`Tipo de archivo no soportado: ${file.name}`);
+            this.showError(`Tipo de archivo no soportado: ${file.name}. Solo se permiten PDF e imágenes PNG/JPEG.`);
             return false;
         }
         
         if (file.size > this.maxSingleFile) {
-            this.showError(`Archivo demasiado grande: ${file.name}`);
+            this.showError(`Archivo demasiado grande: ${file.name}. Máximo ${this.formatFileSize(this.maxSingleFile)} por archivo.`);
             return false;
         }
         
@@ -1459,7 +497,7 @@ IMPORTANTE: No respondas con JSON, responde con texto natural conversacional.`;
             </div>
             <div class="file-status">
                 <div class="status-indicator processing"></div>
-                <span class="status-text">Cargando...</span>
+                <span class="status-text">Procesando...</span>
             </div>
             <div class="file-progress">
                 <div class="progress-bar-partial"></div>
@@ -1477,10 +515,13 @@ IMPORTANTE: No respondas con JSON, responde con texto natural conversacional.`;
             
             if (status === 'completed') {
                 progress.style.width = '100%';
-                progress.className = 'progress-bar-full';
+                progress.style.backgroundColor = '#10b981';
             } else if (status === 'error') {
                 progress.style.width = '0%';
                 progress.style.backgroundColor = '#dc2626';
+            } else if (status === 'processing') {
+                progress.style.width = '50%';
+                progress.style.backgroundColor = '#3b82f6';
             }
         };
         
@@ -1522,6 +563,41 @@ IMPORTANTE: No respondas con JSON, responde con texto natural conversacional.`;
             console.error('Error en processFile:', error);
             throw error;
         }
+    }
+    
+    // Extract text from PDF
+    async extractTextFromPDF(file) {
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = '';
+            
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\\n\\n';
+            }
+            
+            return fullText;
+        } catch (error) {
+            console.error('Error extracting PDF text:', error);
+            throw new Error('Error al extraer texto del PDF');
+        }
+    }
+    
+    // Convert image to base64
+    async convertImageToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // Remove data:image/jpeg;base64, prefix for Gemini
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
     }
     
     // Create extraction prompt based on document type
@@ -1654,6 +730,64 @@ ${extractionFields}`;
 }`;
     }
     
+    // Call Gemini API
+    async callGeminiAPI(prompt, content, fileType) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
+        
+        let parts;
+        
+        if (fileType === 'application/pdf') {
+            // For PDF, send as text
+            parts = [
+                { text: prompt },
+                { text: `\\n\\nCONTENIDO DEL DOCUMENTO:\\n${content}` }
+            ];
+        } else {
+            // For images, send as multimodal
+            parts = [
+                { text: prompt },
+                { 
+                    inlineData: {
+                        mimeType: fileType,
+                        data: content
+                    }
+                }
+            ];
+        }
+        
+        const requestBody = {
+            contents: [{
+                parts: parts
+            }]
+        };
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+                throw new Error('Respuesta inválida de la API de Gemini');
+            }
+            
+            return data.candidates[0].content.parts[0].text;
+        } catch (error) {
+            console.error('Error calling Gemini API:', error);
+            throw new Error(`Error en API de Gemini: ${error.message}`);
+        }
+    }
+    
     // Parse extraction response
     parseExtractionResponse(response) {
         try {
@@ -1662,7 +796,10 @@ ${extractionFields}`;
             
             // Remove any markdown formatting
             if (cleanResponse.startsWith('```json')) {
-                cleanResponse = cleanResponse.replace(/```json\s*/, '').replace(/\s*```$/, '');
+                cleanResponse = cleanResponse.replace(/```json\\s*/, '').replace(/\\s*```$/, '');
+            }
+            if (cleanResponse.startsWith('```')) {
+                cleanResponse = cleanResponse.replace(/```[\\s\\S]*?\\n/, '').replace(/\\s*```$/, '');
             }
             
             const parsedData = JSON.parse(cleanResponse);
@@ -1672,11 +809,11 @@ ${extractionFields}`;
                 timestamp: new Date().toISOString(),
                 document_type: this.currentDocumentType,
                 campos_extraidos: this.calculateExtractedFields(parsedData),
-                confianza_global: 85 // Placeholder
+                confianza_global: 85 // Placeholder - could be calculated based on data completeness
             };
         } catch (error) {
-            console.error('Error parsing response:', error);
-            throw new Error('Error parsing extraction response');
+            console.error('Error parsing response:', error, 'Raw response:', response);
+            throw new Error('Error al procesar la respuesta de la IA. Verifica que el documento sea legible.');
         }
     }
     
@@ -1847,38 +984,13 @@ ${extractionFields}`;
     }
     
     displayGravamen(data) {
-        // Add gravamen card if it doesn't exist
-        let card = document.getElementById('gravamenCard');
-        if (!card) {
-            card = this.createGravamenCard();
-            document.getElementById('extractedDataContainer').appendChild(card);
-        }
+        const card = document.getElementById('gravamenCard');
+        const content = document.getElementById('gravamenContent');
         
-        const content = card.querySelector('.card-content');
-        if (content) {
-            content.innerHTML = this.createDataRows(data);
-            card.style.display = 'block';
-        }
-    }
-    
-    // Create gravamen card
-    createGravamenCard() {
-        const card = document.createElement('div');
-        card.className = 'data-card';
-        card.id = 'gravamenCard';
-        card.style.display = 'none';
+        if (!card || !content) return;
         
-        card.innerHTML = `
-            <div class="card-header">
-                <div class="card-icon">🏦</div>
-                <h4>Información del Gravamen</h4>
-            </div>
-            <div class="card-content">
-                <!-- Dynamic content will be added here -->
-            </div>
-        `;
-        
-        return card;
+        content.innerHTML = this.createDataRows(data);
+        card.style.display = 'block';
     }
     
     displayCalidadExtraccion(extractedData) {
@@ -1920,7 +1032,7 @@ ${extractionFields}`;
     
     // Format field labels
     formatLabel(key) {
-        const labels = {
+        const labelMap = {
             'expediente_catastral': 'Expediente Catastral',
             'lote': 'Lote',
             'manzana': 'Manzana',
@@ -1928,44 +1040,28 @@ ${extractionFields}`;
             'colonia': 'Colonia',
             'municipio': 'Municipio',
             'codigo_postal': 'Código Postal',
-            'tipo_predio': 'Tipo Predio',
-            'ubicacion': 'Ubicación',
+            'tipo_predio': 'Tipo de Predio',
             'norte': 'Norte',
             'sur': 'Sur',
             'este': 'Este',
             'oeste': 'Oeste',
             'vendedor_nombre': 'Vendedor',
-            'vendedor_curp': 'CURP Vendedor',
-            'vendedor_rfc': 'RFC Vendedor',
             'comprador_nombre': 'Comprador',
-            'comprador_curp': 'CURP Comprador',
-            'comprador_rfc': 'RFC Comprador',
-            'regimen_matrimonial': 'Régimen Matrimonial',
-            'tipo_acto': 'Tipo Acto',
-            'numero_escritura': 'Número Escritura',
-            'fecha_escritura': 'Fecha Escritura',
-            'notario_nombre': 'Notario',
-            'notario_numero': 'Número Notario',
-            'valor_operacion': 'Valor Operación',
-            'moneda': 'Moneda',
+            'tipo_acto': 'Tipo de Acto',
+            'numero_escritura': 'Número de Escritura',
+            'fecha_escritura': 'Fecha de Escritura',
+            'notario_nombre': 'Nombre del Notario',
+            'notario_numero': 'Número de Notario',
+            'valor_operacion': 'Valor de la Operación',
             'volumen': 'Volumen',
             'libro': 'Libro',
             'seccion': 'Sección',
             'inscripcion': 'Inscripción',
             'folio_real': 'Folio Real',
-            'fecha_registro': 'Fecha Registro',
-            'inscripcion_anterior': 'Inscripción Anterior',
-            'volumen_anterior': 'Volumen Anterior',
-            'fecha_anterior': 'Fecha Anterior',
-            'tipo_gravamen': 'Tipo Gravamen',
-            'acreedor': 'Acreedor',
-            'deudor': 'Deudor',
-            'monto_gravamen': 'Monto Gravamen',
-            'plazo': 'Plazo',
-            'garantia': 'Garantía'
+            'fecha_registro': 'Fecha de Registro'
         };
         
-        return labels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        return labelMap[key] || key.replace(/_/g, ' ').replace(/\\b\\w/g, l => l.toUpperCase());
     }
     
     // Update visible cards based on document type
@@ -1974,12 +1070,6 @@ ${extractionFields}`;
         const gravamenOnlyCards = ['gravamenCard'];
         
         if (this.currentDocumentType === 'propiedad') {
-            propiedadOnlyCards.forEach(cardId => {
-                const card = document.getElementById(cardId);
-                if (card && card.style.display !== 'none') {
-                    card.style.display = 'block';
-                }
-            });
             gravamenOnlyCards.forEach(cardId => {
                 const card = document.getElementById(cardId);
                 if (card) card.style.display = 'none';
@@ -1988,10 +1078,6 @@ ${extractionFields}`;
             propiedadOnlyCards.forEach(cardId => {
                 const card = document.getElementById(cardId);
                 if (card) card.style.display = 'none';
-            });
-            gravamenOnlyCards.forEach(cardId => {
-                const card = document.getElementById(cardId);
-                if (card) card.style.display = 'block';
             });
         }
     }
@@ -2023,14 +1109,362 @@ ${extractionFields}`;
         if (uploadedFilesList) {
             uploadedFilesList.innerHTML = '';
         }
-        this.uploadedFiles = [];
+    }
+    
+    // Initialize chat functionality
+    initializeChat() {
+        if (this.sendChatBtn) {
+            this.sendChatBtn.addEventListener('click', () => this.sendChatMessage());
+        }
+        
+        if (this.chatInput) {
+            this.chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendChatMessage();
+                }
+            });
+        }
+        
+        // Initialize panel tabs
+        document.querySelectorAll('.panel-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const panelType = e.target.dataset.panel;
+                this.switchPanel(panelType);
+            });
+        });
+        
+        console.log('✅ Chat inicializado');
+    }
+    
+    // Switch between panels (tables/chat)
+    switchPanel(panelType) {
+        // Update tab active state
+        document.querySelectorAll('.panel-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelector(`[data-panel="${panelType}"]`).classList.add('active');
+        
+        // Update panel visibility
+        document.querySelectorAll('.data-panel').forEach(panel => {
+            panel.classList.remove('active');
+        });
+        
+        if (panelType === 'tables') {
+            document.getElementById('tablesPanel').classList.add('active');
+        } else if (panelType === 'chat') {
+            document.getElementById('chatPanel').classList.add('active');
+        }
+    }
+    
+    // Send chat message
+    async sendChatMessage() {
+        if (!this.chatInput || !this.apiKey) return;
+        
+        const message = this.chatInput.value.trim();
+        if (!message) return;
+        
+        // Clear input
+        this.chatInput.value = '';
+        
+        // Add user message to chat
+        this.addChatMessage('user', message);
+        
+        // Show typing indicator
+        const typingId = this.addChatMessage('assistant', 'Escribiendo...', true);
+        
+        try {
+            const response = await this.callChatWithGemini(message);
+            
+            // Remove typing indicator and add actual response
+            this.removeChatMessage(typingId);
+            this.addChatMessage('assistant', response);
+            
+        } catch (error) {
+            console.error('Error en chat:', error);
+            this.removeChatMessage(typingId);
+            this.addChatMessage('assistant', 'Lo siento, ocurrió un error al procesar tu mensaje. Por favor intenta de nuevo.');
+        }
+    }
+    
+    // Add message to chat
+    addChatMessage(sender, content, isTyping = false) {
+        const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message message--${sender === 'user' ? 'user' : 'bot'} ${isTyping ? 'typing' : ''}`;
+        messageDiv.id = messageId;
+        
+        messageDiv.innerHTML = `
+            <div class="message-avatar">
+                ${sender === 'user' ? '👤' : '🤖'}
+            </div>
+            <div class="message-bubble">
+                ${isTyping ? '<div class="typing-dots"><span></span><span></span><span></span></div>' : content}
+            </div>
+            <div class="message-timestamp">
+                ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+        `;
+        
+        if (this.chatMessages) {
+            // Remove welcome message if it exists
+            const welcomeMessage = this.chatMessages.querySelector('.welcome-message');
+            if (welcomeMessage && !isTyping) {
+                welcomeMessage.remove();
+            }
+            
+            this.chatMessages.appendChild(messageDiv);
+            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        }
+        
+        return messageId;
+    }
+    
+    // Remove message from chat
+    removeChatMessage(messageId) {
+        const message = document.getElementById(messageId);
+        if (message) {
+            message.remove();
+        }
+    }
+    
+    // Call chat with Gemini
+    async callChatWithGemini(message) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
+        
+        let contextPrompt = `Eres un experto analista de documentos catastrales y notariales mexicanos. Tu función es:
+
+1. ANALIZAR documentos catastrales con precisión técnica
+2. RESPONDER preguntas sobre datos extraídos de forma clara y detallada
+3. EXPLICAR terminología legal/catastral cuando sea necesario
+4. PROPORCIONAR insights y recomendaciones basadas en los datos
+5. MANTENER un tono profesional pero accesible
+
+IMPORTANTE:
+- Si hay datos extraídos disponibles, úsalos como contexto principal
+- Sé específico y preciso en tus respuestas
+- Explica conceptos técnicos cuando sea relevante
+- Si no tienes información suficiente, indica qué datos adicionales serían útiles`;
+        
+        // Add extracted data context if available
+        if (this.extractedData) {
+            contextPrompt += `\\n\\nDATOS EXTRAÍDOS DEL DOCUMENTO ACTUAL:\\n${JSON.stringify(this.extractedData, null, 2)}`;
+            contextPrompt += `\\n\\nEl usuario puede preguntarte sobre cualquier aspecto de estos datos extraídos.`;
+        } else {
+            contextPrompt += `\\n\\nActualmente no hay datos extraídos disponibles. El usuario puede estar preguntando sobre el proceso de extracción o documentos en general.`;
+        }
+        
+        const requestBody = {
+            contents: [
+                {
+                    parts: [{ text: contextPrompt }]
+                },
+                {
+                    parts: [{ text: `Usuario pregunta: ${message}` }]
+                }
+            ]
+        };
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+                throw new Error('Respuesta inválida de la API');
+            }
+            
+            return data.candidates[0].content.parts[0].text;
+        } catch (error) {
+            console.error('Error in chat API call:', error);
+            throw error;
+        }
+    }
+    
+    // Tab functionality for analysis section
+    initializeTabs() {
+        const tabs = document.querySelectorAll('.nav-tab');
+        const panels = document.querySelectorAll('.tab-panel');
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const targetTab = e.target.dataset.tab;
+                
+                // Update active tab
+                tabs.forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // Update active panel
+                panels.forEach(panel => {
+                    panel.classList.remove('active');
+                });
+                
+                const targetPanel = document.getElementById(targetTab + 'Tab');
+                if (targetPanel) {
+                    targetPanel.classList.add('active');
+                }
+            });
+        });
+        
+        console.log('✅ Tabs inicializados');
+    }
+    
+    // Export results
+    exportResults(format) {
+        if (!this.extractedData) {
+            this.showError('No hay datos extraídos para exportar.');
+            return;
+        }
+        
+        let content = '';
+        let filename = '';
+        let mimeType = '';
+        
+        switch (format) {
+            case 'json':
+                content = JSON.stringify(this.extractedData, null, 2);
+                filename = `datos_catastrales_${new Date().getTime()}.json`;
+                mimeType = 'application/json';
+                break;
+            case 'csv':
+                content = this.convertToCSV(this.extractedData);
+                filename = `datos_catastrales_${new Date().getTime()}.csv`;
+                mimeType = 'text/csv';
+                break;
+            case 'summary':
+                content = this.createSummaryReport(this.extractedData);
+                filename = `resumen_catastral_${new Date().getTime()}.txt`;
+                mimeType = 'text/plain';
+                break;
+        }
+        
+        // Create and download file
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        this.hideExportModal();
+        this.showSuccess(`Archivo ${filename} descargado correctamente.`);
+    }
+    
+    // Convert data to CSV
+    convertToCSV(data) {
+        const rows = [];
+        rows.push(['Campo', 'Valor', 'Sección']);
+        
+        const addRows = (obj, section) => {
+            for (let [key, value] of Object.entries(obj)) {
+                if (typeof value === 'object' && value !== null) {
+                    addRows(value, key);
+                } else if (value && value !== 'NO_CONSTA') {
+                    rows.push([this.formatLabel(key), value, section]);
+                }
+            }
+        };
+        
+        addRows(data.datos_extraidos, 'root');
+        
+        return rows.map(row => 
+            row.map(field => `"${field?.toString().replace(/"/g, '""') || ''}"`)
+               .join(',')
+        ).join('\\n');
+    }
+    
+    // Create summary report
+    createSummaryReport(data) {
+        const timestamp = new Date(data.timestamp).toLocaleString('es-ES');
+        const docType = data.document_type === 'propiedad' ? 'Propiedad' : 'Gravamen';
+        
+        let report = `REPORTE DE ANÁLISIS CATASTRAL\\n`;
+        report += `==========================================\\n\\n`;
+        report += `Fecha de análisis: ${timestamp}\\n`;
+        report += `Tipo de documento: ${docType}\\n`;
+        report += `Campos extraídos: ${data.campos_extraidos.extracted}/${data.campos_extraidos.total}\\n`;
+        report += `Confianza global: ${data.confianza_global}%\\n\\n`;
+        
+        const createSection = (title, sectionData) => {
+            if (!sectionData) return '';
+            
+            let section = `${title.toUpperCase()}\\n`;
+            section += '-'.repeat(title.length) + '\\n';
+            
+            for (let [key, value] of Object.entries(sectionData)) {
+                if (value && value !== 'NO_CONSTA') {
+                    section += `${this.formatLabel(key)}: ${value}\\n`;
+                }
+            }
+            section += '\\n';
+            return section;
+        };
+        
+        const datos = data.datos_extraidos;
+        
+        if (datos.informacion_predio) {
+            report += createSection('Información del Predio', datos.informacion_predio);
+        }
+        
+        if (datos.medidas_colindancias) {
+            report += createSection('Medidas y Colindancias', datos.medidas_colindancias);
+        }
+        
+        if (datos.titulares) {
+            report += createSection('Titulares', datos.titulares);
+        }
+        
+        if (datos.acto_juridico) {
+            report += createSection('Acto Jurídico', datos.acto_juridico);
+        }
+        
+        if (datos.datos_registrales) {
+            report += createSection('Datos Registrales', datos.datos_registrales);
+        }
+        
+        if (datos.antecedentes) {
+            report += createSection('Antecedentes', datos.antecedentes);
+        }
+        
+        if (datos.gravamen) {
+            report += createSection('Información del Gravamen', datos.gravamen);
+        }
+        
+        return report;
+    }
+    
+    // Show/hide export modal
+    showExportModal() {
+        if (this.exportModal) {
+            this.exportModal.classList.remove('hidden');
+        }
+    }
+    
+    hideExportModal() {
+        if (this.exportModal) {
+            this.exportModal.classList.add('hidden');
+        }
     }
     
     // Utility functions
     getFileIcon(type) {
         if (type === 'application/pdf') return '📄';
         if (type.startsWith('image/')) return '🖼️';
-        return '📎';
+        return '📁';
     }
     
     formatFileSize(bytes) {
@@ -2043,74 +1477,87 @@ ${extractionFields}`;
     
     showError(message) {
         console.error('❌', message);
-        // You can implement a toast notification here
-        alert(message); // Simple implementation for now
+        
+        // You could add a toast notification system here
+        // For now, we'll use a simple alert
+        if (typeof window !== 'undefined') {
+            // Create a temporary error message
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-toast';
+            errorDiv.textContent = message;
+            errorDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #dc2626;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                max-width: 400px;
+                word-wrap: break-word;
+            `;
+            
+            document.body.appendChild(errorDiv);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.parentNode.removeChild(errorDiv);
+                }
+            }, 5000);
+        }
     }
     
-    // Tab functionality for analysis section
-    initializeTabs() {
-        console.log('🔄 Inicializando funcionalidad de tabs...');
+    showSuccess(message) {
+        console.log('✅', message);
         
-        // Main navigation tabs
-        const navTabs = document.querySelectorAll('.nav-tab');
-        const tabPanels = document.querySelectorAll('.tab-panel');
+        // Create a temporary success message
+        const successDiv = document.createElement('div');
+        successDiv.className = 'success-toast';
+        successDiv.textContent = message;
+        successDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            max-width: 400px;
+            word-wrap: break-word;
+        `;
         
-        console.log(`📊 Encontrados ${navTabs.length} nav tabs y ${tabPanels.length} tab panels`);
+        document.body.appendChild(successDiv);
         
-        navTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const targetTab = tab.getAttribute('data-tab');
-                console.log(`🔄 Cambiando a tab: ${targetTab}`);
-                
-                // Remove active class from all tabs and panels
-                navTabs.forEach(t => t.classList.remove('active'));
-                tabPanels.forEach(p => p.classList.remove('active'));
-                
-                // Add active class to clicked tab and corresponding panel
-                tab.classList.add('active');
-                const targetPanel = document.getElementById(targetTab + 'Tab');
-                if (targetPanel) {
-                    targetPanel.classList.add('active');
-                    console.log(`✅ Tab activado: ${targetTab}`);
-                } else {
-                    console.error(`❌ No se encontró panel: ${targetTab}Tab`);
-                }
-            });
-        });
-        
-        // Panel tabs (Tables/Chat)
-        const panelTabs = document.querySelectorAll('.panel-tab');
-        const dataPanels = document.querySelectorAll('.data-panel');
-        
-        console.log(`📊 Encontrados ${panelTabs.length} panel tabs y ${dataPanels.length} data panels`);
-        
-        panelTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const targetPanel = tab.getAttribute('data-panel');
-                console.log(`🔄 Cambiando a panel: ${targetPanel}`);
-                
-                // Remove active class from all panel tabs and panels
-                panelTabs.forEach(t => t.classList.remove('active'));
-                dataPanels.forEach(p => p.classList.remove('active'));
-                
-                // Add active class to clicked tab and corresponding panel
-                tab.classList.add('active');
-                const targetDataPanel = document.getElementById(targetPanel + 'Panel');
-                if (targetDataPanel) {
-                    targetDataPanel.classList.add('active');
-                    console.log(`✅ Panel activado: ${targetPanel}`);
-                } else {
-                    console.error(`❌ No se encontró data panel: ${targetPanel}Panel`);
-                }
-            });
-        });
-        
-        console.log('✅ Tabs inicializados correctamente');
+        // Remove after 3 seconds
+        setTimeout(() => {
+            if (successDiv.parentNode) {
+                successDiv.parentNode.removeChild(successDiv);
+            }
+        }, 3000);
     }
 }
 
-// Initialize the analyzer when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize the application when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Inicializando CloudRun AI Catastral...');
+    
+    // Create global instance
     window.analyzer = new CatastralAnalyzer();
-    console.log('✅ Analizador Catastral inicializado correctamente');
+    
+    console.log('✅ Aplicación inicializada correctamente');
+});
+
+// Handle any uncaught errors
+window.addEventListener('error', function(e) {
+    console.error('Error global:', e.error);
+});
+
+// Handle unhandled promise rejections
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('Promise rechazada:', e.reason);
 });
