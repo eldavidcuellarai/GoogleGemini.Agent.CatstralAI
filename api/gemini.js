@@ -16,8 +16,16 @@ export default async function handler(req, res) {
 
     // Verificar que la API key esté configurada
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        return res.status(500).json({ error: 'API key not configured' });
+    if (!apiKey || apiKey === 'your_actual_api_key_here') {
+        const errorMessage = !apiKey 
+            ? 'API key not configured on server. The GEMINI_API_KEY environment variable is missing.'
+            : 'Invalid API Key. The GEMINI_API_KEY is set to a placeholder value.';
+        
+        console.error(`Error: ${errorMessage}`);
+        return res.status(500).json({ 
+            error: 'Server Configuration Error',
+            details: errorMessage
+        });
     }
 
     try {

@@ -7,8 +7,8 @@ class CatastralAnalyzer {
         this.currentDocumentType = 'propiedad';
         this.extractedData = null;
         this.processingFiles = new Map(); // Track processing files
-        this.geminiModel = 'gemini-2.5-pro';
-        this.geminiFallbackModel = 'gemini-2.5-flash';
+        this.geminiModel = 'gemini-1.5-pro';
+        this.geminiFallbackModel = 'gemini-1.5-flash';
 
         // Initialize immediately with error handling
         try {

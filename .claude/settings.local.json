@@ -12,7 +12,8 @@
       "Bash(gh auth:*)",
       "Bash(xcopy:*)",
       "Bash(rm:*)",
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "Bash(node server.js)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

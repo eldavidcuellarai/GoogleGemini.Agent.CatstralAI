@@ -24,11 +24,13 @@ app.post('/api/gemini', async (req, res) => {
     // Verificar que la API key esté configurada
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
+        console.error('GEMINI_API_KEY not found in environment variables');
+        console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('GEMINI')));
         return res.status(500).json({ error: 'API key not configured' });
     }
 
     try {
-        const { text, model = 'gemini-2.5-pro', systemPrompt, image } = req.body;
+        const { text, model = 'gemini-1.5-pro', systemPrompt, image } = req.body;
 
         if (!text) {
             return res.status(400).json({ error: 'Text is required' });
@@ -134,10 +136,10 @@ app.post('/api/gemini', async (req, res) => {
             console.error('Gemini API error:', errorData);
             
             // Si el modelo principal falla, intentar con el modelo de respaldo
-            if (model === 'gemini-2.5-pro') {
-                console.log('Intentando con modelo de respaldo gemini-2.5-flash');
+            if (model === 'gemini-1.5-pro') {
+                console.log('Intentando con modelo de respaldo gemini-1.5-flash');
                 
-                const fallbackResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                const fallbackResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -150,7 +152,9 @@ app.post('/api/gemini', async (req, res) => {
                 });
 
                 if (!fallbackResponse.ok) {
-                    throw new Error(`Gemini API error: ${response.status}`);
+                    const fallbackErrorData = await fallbackResponse.text();
+                    console.error('Fallback Gemini API error:', fallbackErrorData);
+                    throw new Error(`Gemini API error: ${fallbackResponse.status}`);
                 }
 
                 const fallbackData = await fallbackResponse.json();
@@ -171,9 +175,11 @@ app.post('/api/gemini', async (req, res) => {
 
     } catch (error) {
         console.error('Error in Gemini API handler:', error);
+        console.error('Error stack:', error.stack);
         return res.status(500).json({ 
             error: 'Failed to process request',
-            details: error.message 
+            details: error.message,
+            timestamp: new Date().toISOString()
         });
     }
 });
