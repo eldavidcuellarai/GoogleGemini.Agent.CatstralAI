@@ -119,19 +119,10 @@ class CatastralAnalyzer {
     
     loadConfiguration() {
         try {
-            // Try to get API key from environment variable
-            const envApiKey = this.getEnvironmentVariable('GEMINI_API_KEY') || this.getEnvironmentVariable('GOOGLE_GENERATIVE_AI_API_KEY');
+            // API key is now handled by serverless function, no need to check in frontend
+            console.log('✅ Using serverless API configuration');
             
-            if (envApiKey) {
-                this.apiKey = envApiKey;
-                console.log('✅ Using API key from environment variable');
-            } else {
-                console.warn('⚠️ No GEMINI_API_KEY found in environment variables');
-                // For deployment, the API key should always be available from environment
-                // If not available, we'll still try to enable the interface
-            }
-            
-            // Always enable the interface since configuration is no longer required from UI
+            // Always enable the interface since API key is handled server-side
             this.enableInterface();
             
         } catch (error) {
@@ -355,10 +346,7 @@ class CatastralAnalyzer {
     
     // Handle file upload - Enhanced with better user feedback
     async handleFiles(files) {
-        if (!this.apiKey) {
-            this.showError('⚙️ API Key requerida\n\nNo se encontró la clave API de Gemini en las variables de entorno.\n\n🔗 Configura GEMINI_API_KEY en tu plataforma de despliegue.');
-            return;
-        }
+        // API key is handled by serverless function, no need to check here
         
         const fileArray = Array.from(files);
         const validFiles = [];
@@ -545,9 +533,7 @@ class CatastralAnalyzer {
     
     // Process file with Gemini
     async processFile(file) {
-        if (!this.apiKey) {
-            throw new Error('API key no configurada');
-        }
+        // API key is handled by serverless function, no need to check here
         
         try {
             let fileContent;
@@ -1316,10 +1302,7 @@ ${extractionFields}`;
             return;
         }
         
-        if (!this.apiKey) {
-            this.addChatMessage('system', '⚠️ API Key no configurada.\n\nPor favor configura tu API Key de Google AI Studio en la sección de Configuración antes de usar el chat.');
-            return;
-        }
+        // API key is handled by serverless function, no need to check here
         
         const message = this.chatInput.value.trim();
         if (!message) {
