@@ -718,18 +718,33 @@ class CatastralAnalyzer {
         
         try {
             let fileContent;
+            let fileType = file.type;
+            let isScannedPDF = false;
             
             if (file.type === 'application/pdf') {
-                fileContent = await this.extractTextFromPDF(file);
+                try {
+                    fileContent = await this.extractTextFromPDF(file);
+                    console.log('✅ PDF con texto extraíble procesado');
+                } catch (error) {
+                    if (error.message.includes('no contiene texto extraíble')) {
+                        console.log('📷 PDF escaneado detectado, enviando como imagen a Gemini...');
+                        // Convert PDF to base64 for vision processing
+                        fileContent = await this.convertPDFToBase64(file);
+                        fileType = 'application/pdf-scanned'; // Custom type to handle differently
+                        isScannedPDF = true;
+                    } else {
+                        throw error;
+                    }
+                }
             } else {
                 fileContent = await this.convertImageToBase64(file);
             }
             
             // Create extraction prompt
-            const extractionPrompt = this.createExtractionPrompt();
+            const extractionPrompt = this.createExtractionPrompt(isScannedPDF);
             
             // Call Gemini API
-            const response = await this.callGeminiAPI(extractionPrompt, fileContent, file.type);
+            const response = await this.callGeminiAPI(extractionPrompt, fileContent, fileType);
             
             return this.parseExtractionResponse(response);
             
@@ -749,25 +764,52 @@ class CatastralAnalyzer {
             
             console.log('📄 Extrayendo texto del PDF:', file.name);
             const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            
+            // Use parameters similar to v0 version to avoid worker issues
+            const params = {
+                data: arrayBuffer,
+                disableWorker: true,
+                useWorker: false
+            };
+            
+            const pdf = await pdfjsLib.getDocument(params).promise;
             let fullText = '';
+            let totalTextLength = 0;
             
             console.log(`📖 PDF tiene ${pdf.numPages} páginas`);
             
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                 const page = await pdf.getPage(pageNum);
                 const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ');
-                fullText += pageText + '\\n\\n';
+                const pageText = (textContent.items || [])
+                    .map(item => item?.str ?? '')
+                    .join(' ');
+                fullText += `--- PÁGINA ${pageNum} ---\\n${pageText}\\n\\n`;
+                totalTextLength += pageText.length;
                 console.log(`📄 Página ${pageNum} procesada: ${pageText.length} caracteres`);
             }
             
-            console.log(`✅ Texto extraído: ${fullText.length} caracteres totales`);
-            return fullText;
+            // Check if PDF has extractable text (not just scanned images)
+            if (totalTextLength < 50) {
+                throw new Error('❌ Este PDF no contiene texto extraíble. Parece ser escaneado (requiere OCR).');
+            }
+            
+            // Basic text cleanup like v0 version
+            const cleanedText = fullText
+                .replace(/\\s+/g, ' ')
+                .replace(/\\n\\s*\\n/g, '\\n')
+                .replace(/([.!?])\\s*([A-ZÁÉÍÓÚÑ])/g, '$1\\n$2')
+                .trim();
+            
+            console.log(`✅ Texto extraído y limpiado: ${cleanedText.length} caracteres totales`);
+            return cleanedText;
         } catch (error) {
             console.error('Error extracting PDF text:', error);
             if (error.message.includes('PDF.js no está disponible')) {
                 throw new Error('PDF.js no se cargó correctamente. Recarga la página e intenta de nuevo.');
+            }
+            if (error.message.includes('no contiene texto extraíble')) {
+                throw error; // Re-throw as is for scanned PDFs
             }
             throw new Error('Error al extraer texto del PDF: ' + error.message);
         }
@@ -787,9 +829,28 @@ class CatastralAnalyzer {
         });
     }
     
+    // Convert PDF to base64 for scanned PDFs
+    async convertPDFToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // Remove data:application/pdf;base64, prefix for Gemini
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+    
     // Create extraction prompt based on document type
-    createExtractionPrompt() {
-        const basePrompt = `Eres un experto analista de documentos notariales, registrales y catastrales mexicanos. Analiza exhaustivamente el siguiente documento buscando información específica con patrones flexibles.
+    createExtractionPrompt(isScannedPDF = false) {
+        const visionInstruction = isScannedPDF ? 
+            `IMPORTANTE: Este es un PDF escaneado (imagen). Usa tus capacidades de visión para leer el texto de todas las páginas del documento. Lee cuidadosamente cada página, tablas, formularios y cualquier texto visible.
+
+` : '';
+        
+        const basePrompt = `${visionInstruction}Eres un experto analista de documentos notariales, registrales y catastrales mexicanos. Analiza exhaustivamente el siguiente documento buscando información específica con patrones flexibles.
 
 ESTRATEGIA DE BÚSQUEDA:
 - Busca términos similares y variaciones (ej: "expediente", "exp.", "catastral", "clave catastral")
@@ -922,11 +983,23 @@ ${extractionFields}`;
         let model = this.geminiModel || 'gemini-2.5-pro';
         let url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
         let parts;
+        
         if (fileType === 'application/pdf') {
-            // For PDF, send as text
+            // For PDF with text, send as text
             parts = [
                 { text: prompt },
                 { text: `\n\nCONTENIDO DEL DOCUMENTO:\n${content}` }
+            ];
+        } else if (fileType === 'application/pdf-scanned') {
+            // For scanned PDF, send as PDF document for vision processing
+            parts = [
+                { text: prompt },
+                { 
+                    inlineData: {
+                        mimeType: 'application/pdf',
+                        data: content
+                    }
+                }
             ];
         } else {
             // For images, send as multimodal
@@ -1565,22 +1638,21 @@ IMPORTANTE:
         // Build conversation history for better context
         const conversationParts = [];
         
-        // Add system context
+        // Add system context and user message combined
+        const systemAndUserMessage = `${contextPrompt}\n\nPregunta del usuario: ${message}`;
+        
         conversationParts.push({
-            parts: [{ text: contextPrompt }]
+            role: "user",
+            parts: [{ text: systemAndUserMessage }]
         });
         
-        // Add recent conversation history (last 10 messages)
+        // Add recent conversation history (last 10 messages) with correct roles
         const recentHistory = this.conversationHistory.slice(-10);
         recentHistory.forEach(entry => {
             conversationParts.push({
-                parts: [{ text: `${entry.role === 'user' ? 'Usuario' : 'Asistente'}: ${entry.content}` }]
+                role: entry.role === 'user' ? 'user' : 'model',
+                parts: [{ text: entry.content }]
             });
-        });
-        
-        // Add current user message
-        conversationParts.push({
-            parts: [{ text: `Usuario: ${message}` }]
         });
         
         const requestBody = {
