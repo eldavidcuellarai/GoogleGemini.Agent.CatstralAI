@@ -24,10 +24,21 @@ app.post('/api/gemini', async (req, res) => {
     
     // Verificar que la API key esté configurada
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        console.error('GEMINI_API_KEY not found in environment variables');
-        console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('GEMINI')));
-        return res.status(500).json({ error: 'API key not configured' });
+    if (!apiKey || apiKey === 'your_actual_api_key_here') {
+        const errorMessage = !apiKey 
+            ? 'API key not configured on server. The GEMINI_API_KEY environment variable is missing.'
+            : 'Invalid API Key. The GEMINI_API_KEY is set to a placeholder value.';
+        
+        console.error(`Error: ${errorMessage}`);
+        console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('GEMINI') || key.includes('API')));
+        console.error('NODE_ENV:', process.env.NODE_ENV);
+        console.error('PORT:', process.env.PORT);
+        
+        return res.status(500).json({ 
+            error: 'Server Configuration Error',
+            details: errorMessage,
+            timestamp: new Date().toISOString()
+        });
     }
 
     try {

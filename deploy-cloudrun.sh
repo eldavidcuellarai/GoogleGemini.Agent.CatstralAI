@@ -42,10 +42,18 @@ echo "🔗 Service URL: https://$SERVICE_NAME-$REGION.run.app"
 echo ""
 # Set environment variable from local .env file
 if [ -f .env ]; then
-    GEMINI_API_KEY=$(grep GEMINI_API_KEY .env | cut -d '=' -f2)
-    echo "🔑 Setting GEMINI_API_KEY environment variable..."
-    gcloud run services update $SERVICE_NAME --update-env-vars GEMINI_API_KEY="$GEMINI_API_KEY" --region $REGION --project $PROJECT_ID
+    # Read API key more robustly, handling quotes and spaces
+    GEMINI_API_KEY=$(grep "^GEMINI_API_KEY=" .env | cut -d '=' -f2- | sed 's/^"//' | sed 's/"$//')
+    if [ -n "$GEMINI_API_KEY" ]; then
+        echo "🔑 Setting GEMINI_API_KEY environment variable..."
+        echo "🔑 API Key (first 10 chars): ${GEMINI_API_KEY:0:10}..."
+        gcloud run services update $SERVICE_NAME --update-env-vars GEMINI_API_KEY="$GEMINI_API_KEY" --region $REGION --project $PROJECT_ID
+    else
+        echo "⚠️  GEMINI_API_KEY not found in .env file"
+        exit 1
+    fi
 else
     echo "⚠️  .env file not found. Set your environment variable manually:"
     echo "gcloud run services update $SERVICE_NAME --update-env-vars GEMINI_API_KEY=your_api_key_here --region $REGION --project $PROJECT_ID"
+    exit 1
 fi

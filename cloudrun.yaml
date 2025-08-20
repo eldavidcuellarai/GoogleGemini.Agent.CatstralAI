@@ -24,9 +24,6 @@ spec:
       - image: gcr.io/PROJECT_ID/catastral-analyzer
         ports:
         - containerPort: 8080
-        env:
-        - name: GEMINI_API_KEY
-          value: "$(GEMINI_API_KEY)"
         resources:
           limits:
             memory: "4Gi"
