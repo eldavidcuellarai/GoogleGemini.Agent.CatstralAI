@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test PDF Creation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <h1>Crear PDF de prueba para testing</h1>
+    <button onclick="createTestPDF()">Crear PDF de Prueba Catastral</button>
+
+    <script>
+        function createTestPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Title
+            doc.setFontSize(16);
+            doc.text('CARTA CATASTRAL DE PRUEBA', 20, 20);
+            
+            // Sample cadastral data
+            doc.setFontSize(12);
+            doc.text('INFORMACIÓN DEL PREDIO:', 20, 40);
+            doc.text('Clave Catastral: 123456789012345', 20, 50);
+            doc.text('Superficie: 200.50 m²', 20, 60);
+            doc.text('Ubicación: Calle Falsa 123, Col. Centro', 20, 70);
+            doc.text('Valor Catastral: $1,500,000.00', 20, 80);
+            
+            doc.text('COLINDANCIAS:', 20, 100);
+            doc.text('Norte: Con propiedad de Juan Pérez', 20, 110);
+            doc.text('Sur: Con vía pública (Calle Principal)', 20, 120);
+            doc.text('Este: Con propiedad de María García', 20, 130);
+            doc.text('Oeste: Con lote baldío', 20, 140);
+            
+            doc.text('TITULAR:', 20, 160);
+            doc.text('Nombre: José Luis Rodríguez Martínez', 20, 170);
+            doc.text('RFC: ROMJ850315ABC', 20, 180);
+            
+            // Save the PDF
+            doc.save('carta-catastral-prueba.pdf');
+        }
+    </script>
+</body>
+</html>

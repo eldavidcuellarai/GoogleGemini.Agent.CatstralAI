@@ -3,11 +3,13 @@ class CatastralAnalyzer {
         this.apiKey = '';
         this.systemPrompt = '';
         this.conversationHistory = [];
-        this.maxSingleFile = 20 * 1024 * 1024; // 20MB
+    this.maxSingleFile = Infinity; // Sin límite de tamaño por archivo
         this.currentDocumentType = 'propiedad';
         this.extractedData = null;
         this.processingFiles = new Map(); // Track processing files
-        
+        this.geminiModel = 'gemini-2.5-pro';
+        this.geminiFallbackModel = 'gemini-1.5-flash';
+
         // Initialize immediately
         this.initializeElements();
         this.bindEvents();
@@ -20,13 +22,18 @@ class CatastralAnalyzer {
     }
     
     initializeElements() {
-        // Configuration elements
-        this.apiKeyInput = document.getElementById('apiKey');
-        this.systemPromptInput = document.getElementById('systemPrompt');
-        this.saveConfigBtn = document.getElementById('saveConfig');
-        this.configStatus = document.getElementById('configStatus');
-        this.toggleApiKeyBtn = document.getElementById('toggleApiKey');
-        this.themeToggle = document.getElementById('themeToggle');
+    // Configuration elements
+    this.apiKeyInput = document.getElementById('apiKey');
+    this.systemPromptInput = document.getElementById('systemPrompt');
+    this.saveConfigBtn = document.getElementById('saveConfig');
+    this.configStatus = document.getElementById('configStatus');
+    this.toggleApiKeyBtn = document.getElementById('toggleApiKey');
+    this.themeToggle = document.getElementById('themeToggle');
+    this.geminiModelSelect = document.getElementById('geminiModel');
+    // File upload elements
+    this.selectFilesBtn = document.getElementById('selectFilesBtn');
+    this.fileInput = document.getElementById('fileInputCompact');
+    this.uploadArea = document.getElementById('uploadAreaCompact');
         
         // Chat elements
         this.chatInput = document.getElementById('chatInput');
@@ -46,6 +53,13 @@ class CatastralAnalyzer {
         if (this.saveConfigBtn) {
             this.saveConfigBtn.addEventListener('click', () => this.saveConfiguration());
         }
+
+        if (this.geminiModelSelect) {
+            this.geminiModelSelect.addEventListener('change', (e) => {
+                this.geminiModel = e.target.value;
+                localStorage.setItem('catastral-analyzer-gemini-model', this.geminiModel);
+            });
+        }
         
         if (this.toggleApiKeyBtn) {
             this.toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility());
@@ -55,20 +69,7 @@ class CatastralAnalyzer {
             this.themeToggle.addEventListener('click', () => this.toggleTheme());
         }
         
-        // Upload events
-        if (this.selectFilesBtn) {
-            this.selectFilesBtn.addEventListener('click', () => this.fileInput.click());
-        }
-        
-        if (this.fileInput) {
-            this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
-        }
-        
-        if (this.uploadArea) {
-            this.uploadArea.addEventListener('dragover', (e) => this.handleDragOver(e));
-            this.uploadArea.addEventListener('dragleave', (e) => this.handleDragLeave(e));
-            this.uploadArea.addEventListener('drop', (e) => this.handleDrop(e));
-        }
+        // Upload events - Removed handleFileSelect and handleDrop since they're handled in initializeFileUpload()
         
         if (this.processFilesBtn) {
             this.processFilesBtn.addEventListener('click', () => this.processFiles());
@@ -144,6 +145,13 @@ class CatastralAnalyzer {
                         this.systemPrompt = config.systemPrompt || this.systemPromptInput.value;
                     }
                 }
+
+                // Load Gemini model from localStorage or default
+                const savedModel = localStorage.getItem('catastral-analyzer-gemini-model');
+                if (this.geminiModelSelect && savedModel) {
+                    this.geminiModelSelect.value = savedModel;
+                    this.geminiModel = savedModel;
+                }
                 
                 this.enableInterface();
                 this.showConfigStatus(true, 'Configuración cargada desde variables de entorno');
@@ -154,22 +162,25 @@ class CatastralAnalyzer {
             const savedConfig = localStorage.getItem('catastral-analyzer-config');
             if (savedConfig) {
                 const config = JSON.parse(savedConfig);
-                
                 if (this.apiKeyInput) this.apiKeyInput.value = config.apiKey || '';
                 if (this.systemPromptInput) this.systemPromptInput.value = config.systemPrompt || this.systemPromptInput.value;
-                
                 if (config.apiKey && config.systemPrompt) {
                     this.apiKey = config.apiKey;
                     this.systemPrompt = config.systemPrompt;
                     this.enableInterface();
                     this.showConfigStatus(true);
                 }
-                
                 // Load theme preference
                 if (config.theme) {
                     document.documentElement.setAttribute('data-color-scheme', config.theme);
                     this.updateThemeButton(config.theme);
                 }
+            }
+            // Load Gemini model from localStorage or default
+            const savedModel = localStorage.getItem('catastral-analyzer-gemini-model');
+            if (this.geminiModelSelect && savedModel) {
+                this.geminiModelSelect.value = savedModel;
+                this.geminiModel = savedModel;
             }
         } catch (error) {
             console.warn('Error loading configuration:', error);
@@ -341,7 +352,13 @@ class CatastralAnalyzer {
         }
         
         // Button click handler
-        selectBtn.addEventListener('click', () => {
+        selectBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        });
+        
+        // Make upload area clickable
+        uploadArea.addEventListener('click', () => {
             fileInput.click();
         });
         
@@ -352,25 +369,75 @@ class CatastralAnalyzer {
             }
         });
         
-        // Drag and drop handlers
+        // Enhanced drag and drop handlers
+        uploadArea.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('drag-over');
         });
         
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('drag-over');
+        uploadArea.addEventListener('dragleave', (e) => {
+            // Only remove drag-over if we're leaving the upload area entirely
+            if (!uploadArea.contains(e.relatedTarget)) {
+                uploadArea.classList.remove('drag-over');
+            }
         });
         
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('drag-over');
-            if (e.dataTransfer.files.length > 0) {
-                this.handleFiles(e.dataTransfer.files);
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                this.handleFiles(files);
             }
         });
         
-        console.log('✅ Funcionalidad de upload inicializada');
+        // Global drag and drop handlers for better UX
+        let dragCounter = 0;
+        const appContainer = document.querySelector('.app-container');
+        
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            if (appContainer) {
+                appContainer.classList.add('global-drag-over');
+            }
+        });
+        
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0 && appContainer) {
+                appContainer.classList.remove('global-drag-over');
+            }
+        });
+        
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            if (appContainer) {
+                appContainer.classList.remove('global-drag-over');
+            }
+            
+            // If dropped outside upload area, still handle the files
+            if (e.target !== uploadArea && !uploadArea.contains(e.target)) {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    this.handleFiles(files);
+                }
+            }
+        });
+        
+        console.log('✅ Funcionalidad de upload inicializada con drag & drop mejorado');
     }
     
     // Initialize document type slider
@@ -421,58 +488,133 @@ class CatastralAnalyzer {
         console.log(`🔄 Cambiado a tipo de documento: ${type}`);
     }
     
-    // Handle file upload
+    // Handle file upload - Enhanced with better user feedback
     async handleFiles(files) {
         if (!this.apiKey) {
-            this.showError('Por favor configura tu API Key primero');
+            this.showError('⚙️ Configuración requerida\n\nPor favor configura tu API Key de Google AI Studio primero para poder procesar documentos.\n\n🔗 Obtén tu clave en: https://makersuite.google.com/app/apikey');
             return;
         }
         
-        console.log(`📁 Procesando ${files.length} archivo(s)...`);
+        const fileArray = Array.from(files);
+        const validFiles = [];
+        const invalidFiles = [];
         
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
+        // Validate all files first
+        fileArray.forEach(file => {
+            if (this.validateFile(file)) {
+                validFiles.push(file);
+            } else {
+                invalidFiles.push(file);
+            }
+        });
+        
+        if (validFiles.length === 0) {
+            this.showError('❌ No hay archivos válidos para procesar.\n\n💡 Verifica que los archivos sean PDF o imágenes y no excedan los límites de tamaño.');
+            return;
+        }
+        
+        if (invalidFiles.length > 0) {
+            console.warn(`⚠️ Se omitieron ${invalidFiles.length} archivo(s) inválido(s)`);
+        }
+        
+        console.log(`📁 Procesando ${validFiles.length} archivo(s) válido(s)...`);
+        
+        // Show processing feedback
+        if (validFiles.length > 1) {
+            this.addChatMessage('system', `📤 Subiendo ${validFiles.length} archivos... Esto puede tomar unos momentos.`);
+        }
+        
+        for (let i = 0; i < validFiles.length; i++) {
+            const file = validFiles[i];
             
-            // Validate file
-            if (!this.validateFile(file)) continue;
-            
-            // Add file to UI
-            const fileItem = this.createFileItem(file);
-            this.addFileToList(fileItem);
-            
-            // Process file
             try {
-                fileItem.setStatus('processing', 'Procesando...');
+                // Add file to UI
+                const fileItem = this.createFileItem(file);
+                this.addFileToList(fileItem);
+                
+                // Process file
+                fileItem.setStatus('processing', `Procesando... (${i + 1}/${validFiles.length})`);
+                
                 const extractedData = await this.processFile(file);
                 
                 if (extractedData) {
-                    fileItem.setStatus('completed', 'Completado');
+                    fileItem.setStatus('completed', '✅ Completado');
                     this.displayExtractedData(extractedData);
                     
                     // Add success message to chat
-                    this.addChatMessage('system', `✅ Documento "${file.name}" procesado correctamente. Los datos han sido extraídos y están disponibles en la pestaña de Tablas.`);
+                    this.addChatMessage('system', `✅ Documento "${file.name}" procesado correctamente.\n\n📊 Los datos extraídos están disponibles en la pestaña de Tablas.\n💬 Puedes hacer preguntas sobre el contenido en este chat.`);
                 } else {
-                    fileItem.setStatus('error', 'Error en procesamiento');
+                    fileItem.setStatus('error', '❌ Sin datos extraídos');
+                    this.addChatMessage('system', `⚠️ El documento "${file.name}" fue procesado pero no se pudieron extraer datos estructurados.\n\n💡 Verifica que el documento contenga texto legible y datos catastrales.`);
                 }
             } catch (error) {
                 console.error('Error procesando archivo:', error);
-                fileItem.setStatus('error', error.message || 'Error desconocido');
-                this.showError(`Error procesando ${file.name}: ${error.message}`);
+                const fileItem = document.querySelector(`[data-file-name="${file.name}"]`);
+                if (fileItem && fileItem.setStatus) {
+                    fileItem.setStatus('error', '❌ Error');
+                }
+                this.showError(`💥 Error procesando "${file.name}":\n\n${error.message || 'Error desconocido'}\n\n💡 Intenta con otro archivo o verifica que el documento sea legible.`);
             }
         }
+        
+        if (validFiles.length > 1) {
+            this.addChatMessage('system', `🎉 ¡Procesamiento completado!\n\n📊 Se procesaron ${validFiles.length} documentos.\n💬 Ahora puedes hacer preguntas sobre los datos extraídos.`);
+        }
+    }
+
+    // Limpiar datos extraídos y tarjetas antes de cargar nuevos
+    clearExtractedData() {
+        this.extractedData = null;
+        // Ocultar y limpiar tarjetas de datos
+        const cardIds = [
+            'informacionPredioCard',
+            'medidasColindanciasCard',
+            'titularesCard',
+            'actoJuridicoCard',
+            'datosRegistralesCard',
+            'antecedentesCard',
+            'gravamenCard',
+            'calidadExtraccionCard'
+        ];
+        cardIds.forEach(id => {
+            const card = document.getElementById(id);
+            if (card) {
+                card.style.display = 'none';
+                const content = card.querySelector('.card-content');
+                if (content) content.innerHTML = '';
+            }
+        });
+        // Mostrar mensaje de "No hay datos extraídos"
+        const noDataMessage = document.getElementById('noDataMessage');
+        if (noDataMessage) noDataMessage.style.display = 'block';
+    }
+
+    // Clear uploaded files list
+    clearUploadedFiles() {
+        const uploadedFilesList = document.getElementById('uploadedFilesList');
+        if (uploadedFilesList) {
+            uploadedFilesList.innerHTML = '';
+        }
+        console.log('🗑️ Lista de archivos cargados limpiada');
     }
     
-    // Validate file
+    // Validate file - Enhanced with user-friendly messages
     validateFile(file) {
         const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+        const maxSize = 30 * 1024 * 1024; // 30MB limit
         
         if (!allowedTypes.includes(file.type)) {
-            this.showError(`Tipo de archivo no soportado: ${file.name}. Solo se permiten PDF e imágenes PNG/JPEG.`);
+            console.warn(`❌ Tipo de archivo no soportado: ${file.name} (${file.type})`);
             return false;
         }
         
-        if (file.size > this.maxSingleFile) {
-            this.showError(`Archivo demasiado grande: ${file.name}. Máximo ${this.formatFileSize(this.maxSingleFile)} por archivo.`);
+        if (file.size > maxSize) {
+            console.warn(`❌ Archivo muy grande: ${file.name} (${this.formatFileSize(file.size)})`);
+            return false;
+        }
+        
+        if (file.size === 0) {
+            console.warn(`❌ Archivo vacío: ${file.name}`);
             return false;
         }
         
@@ -732,15 +874,14 @@ ${extractionFields}`;
     
     // Call Gemini API
     async callGeminiAPI(prompt, content, fileType) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
-        
+        let model = this.geminiModel || 'gemini-2.5-pro';
+        let url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
         let parts;
-        
         if (fileType === 'application/pdf') {
             // For PDF, send as text
             parts = [
                 { text: prompt },
-                { text: `\\n\\nCONTENIDO DEL DOCUMENTO:\\n${content}` }
+                { text: `\n\nCONTENIDO DEL DOCUMENTO:\n${content}` }
             ];
         } else {
             // For images, send as multimodal
@@ -754,33 +895,35 @@ ${extractionFields}`;
                 }
             ];
         }
-        
         const requestBody = {
-            contents: [{
-                parts: parts
-            }]
+            contents: [{ parts: parts }]
         };
-        
         try {
-            const response = await fetch(url, {
+            let response = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
-            
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+                // Fallback to alternate model if available
+                if (model !== this.geminiFallbackModel) {
+                    model = this.geminiFallbackModel;
+                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
+                    response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(requestBody)
+                    });
+                }
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+                }
             }
-            
             const data = await response.json();
-            
             if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
                 throw new Error('Respuesta inválida de la API de Gemini');
             }
-            
             return data.candidates[0].content.parts[0].text;
         } catch (error) {
             console.error('Error calling Gemini API:', error);
@@ -793,17 +936,16 @@ ${extractionFields}`;
         try {
             // Clean response and parse JSON
             let cleanResponse = response.trim();
-            
-            // Remove any markdown formatting
+            // Remove markdown code block (```json ... ``` or ``` ... ```)
             if (cleanResponse.startsWith('```json')) {
-                cleanResponse = cleanResponse.replace(/```json\\s*/, '').replace(/\\s*```$/, '');
+                cleanResponse = cleanResponse.replace(/^```json[\r\n]*/i, '').replace(/```\s*$/i, '');
+            } else if (cleanResponse.startsWith('```')) {
+                cleanResponse = cleanResponse.replace(/^```[\r\n]*/i, '').replace(/```\s*$/i, '');
             }
-            if (cleanResponse.startsWith('```')) {
-                cleanResponse = cleanResponse.replace(/```[\\s\\S]*?\\n/, '').replace(/\\s*```$/, '');
-            }
-            
+            // Remove any stray backticks or code block remnants
+            cleanResponse = cleanResponse.replace(/^```+|```+$/g, '').trim();
+            // Now try to parse
             const parsedData = JSON.parse(cleanResponse);
-            
             return {
                 datos_extraidos: parsedData,
                 timestamp: new Date().toISOString(),
@@ -1111,8 +1253,18 @@ ${extractionFields}`;
         }
     }
     
-    // Initialize chat functionality
+    // Initialize chat functionality - Enhanced
     initializeChat() {
+        // Verify chat elements exist
+        this.chatInput = document.getElementById('chatInput');
+        this.sendChatBtn = document.getElementById('sendChatMessage');
+        this.chatMessages = document.getElementById('chatMessages');
+        
+        if (!this.chatInput || !this.sendChatBtn || !this.chatMessages) {
+            console.error('❌ Elementos del chat no encontrados');
+            return;
+        }
+        
         if (this.sendChatBtn) {
             this.sendChatBtn.addEventListener('click', () => this.sendChatMessage());
         }
@@ -1124,6 +1276,12 @@ ${extractionFields}`;
                     this.sendChatMessage();
                 }
             });
+            
+            // Auto-resize textarea
+            this.chatInput.addEventListener('input', () => {
+                this.chatInput.style.height = 'auto';
+                this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 120) + 'px';
+            });
         }
         
         // Initialize panel tabs
@@ -1134,7 +1292,36 @@ ${extractionFields}`;
             });
         });
         
-        console.log('✅ Chat inicializado');
+        // Add welcome message
+        this.addWelcomeMessage();
+        
+        console.log('✅ Chat inicializado correctamente');
+    }
+    
+    // Add welcome message to chat
+    addWelcomeMessage() {
+        if (!this.chatMessages) return;
+        
+        const welcomeDiv = document.createElement('div');
+        welcomeDiv.className = 'welcome-message';
+        welcomeDiv.innerHTML = `
+            <div class="welcome-content">
+                <div class="welcome-icon">🤖</div>
+                <div class="welcome-text">
+                    <h4>¡Hola! Soy tu asistente de documentos catastrales</h4>
+                    <p>Puedes preguntarme sobre:</p>
+                    <ul>
+                        <li>📊 Datos extraídos de documentos procesados</li>
+                        <li>🏠 Información sobre propiedades</li>
+                        <li>⚖️ Aspectos legales y notariales</li>
+                        <li>📋 Comparaciones entre documentos</li>
+                    </ul>
+                    <p><strong>💡 Tip:</strong> Primero sube y procesa un documento para obtener análisis específicos.</p>
+                </div>
+            </div>
+        `;
+        
+        this.chatMessages.appendChild(welcomeDiv);
     }
     
     // Switch between panels (tables/chat)
@@ -1157,12 +1344,28 @@ ${extractionFields}`;
         }
     }
     
-    // Send chat message
+    // Send chat message - Enhanced with better error handling
     async sendChatMessage() {
-        if (!this.chatInput || !this.apiKey) return;
+        if (!this.chatInput) {
+            console.error('Chat input element not found');
+            return;
+        }
+        
+        if (!this.apiKey) {
+            this.addChatMessage('system', '⚠️ API Key no configurada.\n\nPor favor configura tu API Key de Google AI Studio en la sección de Configuración antes de usar el chat.');
+            return;
+        }
         
         const message = this.chatInput.value.trim();
-        if (!message) return;
+        if (!message) {
+            return;
+        }
+        
+        // Validate message length
+        if (message.length > 4000) {
+            this.addChatMessage('system', '❌ Mensaje muy largo.\n\nPor favor usa un mensaje más corto (máximo 4000 caracteres).');
+            return;
+        }
         
         // Clear input
         this.chatInput.value = '';
@@ -1183,40 +1386,74 @@ ${extractionFields}`;
         } catch (error) {
             console.error('Error en chat:', error);
             this.removeChatMessage(typingId);
-            this.addChatMessage('assistant', 'Lo siento, ocurrió un error al procesar tu mensaje. Por favor intenta de nuevo.');
+            
+            let errorMessage = 'Lo siento, ocurrió un error al procesar tu mensaje.';
+            
+            if (error.message.includes('HTTP 400')) {
+                errorMessage = '❌ Error de configuración.\n\nVerifica que tu API Key sea válida y tenga los permisos necesarios.';
+            } else if (error.message.includes('HTTP 401')) {
+                errorMessage = '🔑 API Key inválida.\n\nPor favor verifica que tu API Key de Google AI Studio sea correcta.';
+            } else if (error.message.includes('HTTP 403')) {
+                errorMessage = '🚫 Acceso denegado.\n\nTu API Key no tiene permisos para usar este modelo de IA.';
+            } else if (error.message.includes('HTTP 429')) {
+                errorMessage = '⏰ Límite de uso excedido.\n\nHas alcanzado el límite de requests. Intenta de nuevo más tarde.';
+            } else if (error.message.includes('quota')) {
+                errorMessage = '📊 Cuota excedida.\n\nHas alcanzado tu límite de uso de la API de Google AI Studio.';
+            }
+            
+            this.addChatMessage('assistant', errorMessage + '\n\n💡 Si el problema persiste, revisa tu configuración o intenta más tarde.');
         }
     }
     
-    // Add message to chat
+    // Add message to chat - Enhanced with better formatting
     addChatMessage(sender, content, isTyping = false) {
+        if (!this.chatMessages) {
+            console.error('Chat messages container not found');
+            return null;
+        }
+        
         const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         
         const messageDiv = document.createElement('div');
         messageDiv.className = `message message--${sender === 'user' ? 'user' : 'bot'} ${isTyping ? 'typing' : ''}`;
         messageDiv.id = messageId;
         
+        // Sanitize and format content
+        let formattedContent = content;
+        if (!isTyping && typeof content === 'string') {
+            // Convert newlines to HTML breaks for better display
+            formattedContent = content.replace(/\n/g, '<br>');
+            
+            // Escape HTML to prevent XSS but preserve our <br> tags
+            formattedContent = formattedContent
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/&lt;br&gt;/g, '<br>');
+        }
+        
+        const avatar = sender === 'user' ? '👤' : (sender === 'system' ? '⚙️' : '🤖');
+        
         messageDiv.innerHTML = `
             <div class="message-avatar">
-                ${sender === 'user' ? '👤' : '🤖'}
+                ${avatar}
             </div>
             <div class="message-bubble">
-                ${isTyping ? '<div class="typing-dots"><span></span><span></span><span></span></div>' : content}
+                ${isTyping ? '<div class="typing-dots"><span></span><span></span><span></span></div>' : formattedContent}
             </div>
             <div class="message-timestamp">
                 ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
             </div>
         `;
         
-        if (this.chatMessages) {
-            // Remove welcome message if it exists
-            const welcomeMessage = this.chatMessages.querySelector('.welcome-message');
-            if (welcomeMessage && !isTyping) {
-                welcomeMessage.remove();
-            }
-            
-            this.chatMessages.appendChild(messageDiv);
-            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        // Remove welcome message if it exists
+        const welcomeMessage = this.chatMessages.querySelector('.welcome-message');
+        if (welcomeMessage && !isTyping) {
+            welcomeMessage.remove();
         }
+        
+        this.chatMessages.appendChild(messageDiv);
+        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
         
         return messageId;
     }
@@ -1229,9 +1466,9 @@ ${extractionFields}`;
         }
     }
     
-    // Call chat with Gemini
+    // Call chat with Gemini - Fixed version
     async callChatWithGemini(message) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel}:generateContent?key=${this.apiKey}`;
         
         let contextPrompt = `Eres un experto analista de documentos catastrales y notariales mexicanos. Tu función es:
 
@@ -1249,24 +1486,66 @@ IMPORTANTE:
         
         // Add extracted data context if available
         if (this.extractedData) {
-            contextPrompt += `\\n\\nDATOS EXTRAÍDOS DEL DOCUMENTO ACTUAL:\\n${JSON.stringify(this.extractedData, null, 2)}`;
-            contextPrompt += `\\n\\nEl usuario puede preguntarte sobre cualquier aspecto de estos datos extraídos.`;
+            const dataString = JSON.stringify(this.extractedData, null, 2);
+            contextPrompt += `\n\nDATOS EXTRAÍDOS DEL DOCUMENTO ACTUAL:\n${dataString}`;
+            contextPrompt += `\n\nEl usuario puede preguntarte sobre cualquier aspecto de estos datos extraídos.`;
         } else {
-            contextPrompt += `\\n\\nActualmente no hay datos extraídos disponibles. El usuario puede estar preguntando sobre el proceso de extracción o documentos en general.`;
+            contextPrompt += `\n\nActualmente no hay datos extraídos disponibles. El usuario puede estar preguntando sobre el proceso de extracción o documentos en general.`;
         }
         
+        // Build conversation history for better context
+        const conversationParts = [];
+        
+        // Add system context
+        conversationParts.push({
+            parts: [{ text: contextPrompt }]
+        });
+        
+        // Add recent conversation history (last 10 messages)
+        const recentHistory = this.conversationHistory.slice(-10);
+        recentHistory.forEach(entry => {
+            conversationParts.push({
+                parts: [{ text: `${entry.role === 'user' ? 'Usuario' : 'Asistente'}: ${entry.content}` }]
+            });
+        });
+        
+        // Add current user message
+        conversationParts.push({
+            parts: [{ text: `Usuario: ${message}` }]
+        });
+        
         const requestBody = {
-            contents: [
+            contents: conversationParts,
+            generationConfig: {
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 2048
+            },
+            safetySettings: [
                 {
-                    parts: [{ text: contextPrompt }]
+                    category: "HARM_CATEGORY_HARASSMENT",
+                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
                 },
                 {
-                    parts: [{ text: `Usuario pregunta: ${message}` }]
+                    category: "HARM_CATEGORY_HATE_SPEECH",
+                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
                 }
             ]
         };
         
         try {
+            console.log('Sending chat request to:', url);
+            console.log('Request body:', JSON.stringify(requestBody, null, 2));
+            
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -1275,17 +1554,48 @@ IMPORTANTE:
                 body: JSON.stringify(requestBody)
             });
             
+            const responseText = await response.text();
+            console.log('Response status:', response.status);
+            console.log('Response text:', responseText);
+            
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                try {
+                    const errorData = JSON.parse(responseText);
+                    if (errorData.error && errorData.error.message) {
+                        errorMessage += ` - ${errorData.error.message}`;
+                    }
+                } catch (e) {
+                    errorMessage += ` - ${responseText}`;
+                }
+                throw new Error(errorMessage);
             }
             
-            const data = await response.json();
+            const data = JSON.parse(responseText);
             
-            if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-                throw new Error('Respuesta inválida de la API');
+            if (!data.candidates || data.candidates.length === 0) {
+                throw new Error('No se generó respuesta válida de la API');
             }
             
-            return data.candidates[0].content.parts[0].text;
+            const candidate = data.candidates[0];
+            
+            if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+                throw new Error('Respuesta vacía de la API');
+            }
+            
+            const responseContent = candidate.content.parts[0].text;
+            
+            // Store in conversation history
+            this.conversationHistory.push({ role: 'user', content: message });
+            this.conversationHistory.push({ role: 'assistant', content: responseContent });
+            
+            // Limit history to last 50 messages to prevent context overflow
+            if (this.conversationHistory.length > 50) {
+                this.conversationHistory = this.conversationHistory.slice(-50);
+            }
+            
+            return responseContent;
+            
         } catch (error) {
             console.error('Error in chat API call:', error);
             throw error;

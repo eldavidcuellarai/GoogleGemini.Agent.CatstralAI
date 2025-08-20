@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chat Catastral AI</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-container { max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 200px; }
+        .log { background: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test de Funcionalidad - Chat Catastral AI</h1>
+        
+        <div class="test-section info">
+            <h3>1. Configuración de API</h3>
+            <input type="text" id="testApiKey" placeholder="Ingresa tu API Key de Gemini">
+            <button onclick="testApiKey()">Probar API Key</button>
+        </div>
+        
+        <div class="test-section info">
+            <h3>2. Test de Chat</h3>
+            <input type="text" id="testMessage" placeholder="Mensaje de prueba" value="Hola, ¿cómo funcionas?">
+            <button onclick="testChat()">Enviar Mensaje de Prueba</button>
+        </div>
+        
+        <div class="test-section info">
+            <h3>3. Test de Carga de Archivos</h3>
+            <input type="file" id="testFile" accept=".pdf,image/*">
+            <button onclick="testFileUpload()">Probar Carga de Archivo</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>📋 Log de Resultados</h3>
+            <div id="testLog" class="log">Listo para probar...</div>
+        </div>
+    </div>
+
+    <script>
+        let testLog = document.getElementById('testLog');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}\n`;
+            testLog.textContent += logEntry;
+            testLog.scrollTop = testLog.scrollHeight;
+            
+            if (type === 'error') {
+                testLog.style.borderLeft = '4px solid #dc3545';
+            } else if (type === 'success') {
+                testLog.style.borderLeft = '4px solid #28a745';
+            } else {
+                testLog.style.borderLeft = '4px solid #17a2b8';
+            }
+        }
+        
+        async function testApiKey() {
+            const apiKey = document.getElementById('testApiKey').value.trim();
+            
+            if (!apiKey) {
+                log('❌ Error: Debes ingresar una API Key', 'error');
+                return;
+            }
+            
+            if (!apiKey.startsWith('AIza')) {
+                log('⚠️ Warning: La API Key no tiene el formato esperado', 'error');
+                return;
+            }
+            
+            log('🔑 API Key válida en formato');
+            
+            // Test API call
+            try {
+                log('📡 Probando conexión con API de Gemini...');
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: 'Test de conexión' }] }]
+                    })
+                });
+                
+                if (response.ok) {
+                    log('✅ API Key funcionando correctamente!', 'success');
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Error en API: ${response.status} - ${errorText}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testChat() {
+            const message = document.getElementById('testMessage').value.trim();
+            const apiKey = document.getElementById('testApiKey').value.trim();
+            
+            if (!apiKey) {
+                log('❌ Configura la API Key primero', 'error');
+                return;
+            }
+            
+            if (!message) {
+                log('❌ Ingresa un mensaje de prueba', 'error');
+                return;
+            }
+            
+            log(`💬 Enviando mensaje: "${message}"`);
+            
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ 
+                            parts: [{ text: `Eres un asistente de documentos catastrales. Responde brevemente: ${message}` }] 
+                        }]
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const reply = data.candidates[0].content.parts[0].text;
+                    log(`🤖 Respuesta: ${reply.substring(0, 100)}...`, 'success');
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Error en chat: ${response.status} - ${errorText}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Error en test de chat: ${error.message}`, 'error');
+            }
+        }
+        
+        function testFileUpload() {
+            const fileInput = document.getElementById('testFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                log('❌ Selecciona un archivo primero', 'error');
+                return;
+            }
+            
+            log(`📁 Archivo seleccionado: ${file.name}`);
+            log(`📏 Tamaño: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+            log(`📄 Tipo: ${file.type}`);
+            
+            // Validations
+            const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+            const maxSize = 30 * 1024 * 1024; // 30MB
+            
+            if (!allowedTypes.includes(file.type)) {
+                log(`❌ Tipo de archivo no soportado: ${file.type}`, 'error');
+                return;
+            }
+            
+            if (file.size > maxSize) {
+                log(`❌ Archivo muy grande: ${(file.size / 1024 / 1024).toFixed(2)} MB (máximo 30MB)`, 'error');
+                return;
+            }
+            
+            log('✅ Archivo válido para procesamiento!', 'success');
+        }
+        
+        // Clear log function
+        function clearLog() {
+            testLog.textContent = 'Log limpiado...\n';
+        }
+        
+        // Add clear button
+        window.onload = function() {
+            const clearBtn = document.createElement('button');
+            clearBtn.textContent = 'Limpiar Log';
+            clearBtn.onclick = clearLog;
+            clearBtn.style.float = 'right';
+            testLog.parentElement.appendChild(clearBtn);
+        };
+    </script>
+</body>
+</html>

@@ -8,6 +8,9 @@ class CatastralAnalyzer {
         this.extractedData = null;
         this.processingFiles = new Map(); // Track processing files
         
+        // Force dark theme permanently
+        document.documentElement.setAttribute('data-color-scheme', 'dark');
+        
         // Initialize immediately
         this.initializeElements();
         this.bindEvents();
@@ -26,7 +29,6 @@ class CatastralAnalyzer {
         this.saveConfigBtn = document.getElementById('saveConfig');
         this.configStatus = document.getElementById('configStatus');
         this.toggleApiKeyBtn = document.getElementById('toggleApiKey');
-        this.themeToggle = document.getElementById('themeToggle');
         
         // Chat elements
         this.chatInput = document.getElementById('chatInput');
@@ -49,10 +51,6 @@ class CatastralAnalyzer {
         
         if (this.toggleApiKeyBtn) {
             this.toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility());
-        }
-        
-        if (this.themeToggle) {
-            this.themeToggle.addEventListener('click', () => this.toggleTheme());
         }
         
         // Modal events
@@ -142,11 +140,8 @@ class CatastralAnalyzer {
                     this.showConfigStatus(true);
                 }
                 
-                // Load theme preference
-                if (config.theme) {
-                    document.documentElement.setAttribute('data-color-scheme', config.theme);
-                    this.updateThemeButton(config.theme);
-                }
+                // Force dark theme - no longer load from config
+                document.documentElement.setAttribute('data-color-scheme', 'dark');
             }
         } catch (error) {
             console.warn('Error loading configuration:', error);
@@ -168,12 +163,10 @@ class CatastralAnalyzer {
             
             // Save only system prompt to localStorage
             try {
-                const currentTheme = document.documentElement.getAttribute('data-color-scheme') || 'light';
                 const existingConfig = JSON.parse(localStorage.getItem('catastral-analyzer-config') || '{}');
                 localStorage.setItem('catastral-analyzer-config', JSON.stringify({
                     ...existingConfig,
-                    systemPrompt: systemPrompt,
-                    theme: currentTheme
+                    systemPrompt: systemPrompt
                 }));
             } catch (error) {
                 console.warn('Error saving configuration:', error);
@@ -204,8 +197,7 @@ class CatastralAnalyzer {
         // Save to localStorage
         const config = {
             apiKey: this.apiKey,
-            systemPrompt: this.systemPrompt,
-            theme: document.documentElement.getAttribute('data-color-scheme') || 'light'
+            systemPrompt: this.systemPrompt
         };
         
         localStorage.setItem('catastral-analyzer-config', JSON.stringify(config));
@@ -275,37 +267,6 @@ class CatastralAnalyzer {
         }
     }
     
-    toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-color-scheme') || 'light';
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-        
-        document.documentElement.setAttribute('data-color-scheme', newTheme);
-        this.updateThemeButton(newTheme);
-        
-        // Save theme preference
-        const savedConfig = localStorage.getItem('catastral-analyzer-config');
-        if (savedConfig) {
-            const config = JSON.parse(savedConfig);
-            config.theme = newTheme;
-            localStorage.setItem('catastral-analyzer-config', JSON.stringify(config));
-        }
-    }
-    
-    updateThemeButton(theme) {
-        if (!this.themeToggle) return;
-        
-        const icon = this.themeToggle.querySelector('.theme-icon');
-        const text = this.themeToggle.querySelector('.theme-text');
-        
-        if (theme === 'dark') {
-            if (icon) icon.textContent = '☀️';
-            if (text) text.textContent = 'Claro';
-        } else {
-            if (icon) icon.textContent = '🌙';
-            if (text) text.textContent = 'Oscuro';
-        }
-    }
-    
     // Initialize file upload functionality
     initializeFileUpload() {
         const uploadArea = document.getElementById('uploadAreaCompact');
@@ -318,8 +279,19 @@ class CatastralAnalyzer {
         }
         
         // Button click handler
-        selectBtn.addEventListener('click', () => {
+        selectBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             fileInput.click();
+        });
+        
+        // Make upload area clickable
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        // Prevent clicks on the button from bubbling to the upload area
+        selectBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
         
         // File input change handler
@@ -329,25 +301,75 @@ class CatastralAnalyzer {
             }
         });
         
-        // Drag and drop handlers
+        // Enhanced drag and drop handlers
+        uploadArea.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('drag-over');
         });
         
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('drag-over');
+        uploadArea.addEventListener('dragleave', (e) => {
+            // Only remove drag-over if we're leaving the upload area entirely
+            if (!uploadArea.contains(e.relatedTarget)) {
+                uploadArea.classList.remove('drag-over');
+            }
         });
         
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('drag-over');
-            if (e.dataTransfer.files.length > 0) {
-                this.handleFiles(e.dataTransfer.files);
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                this.handleFiles(files);
             }
         });
         
-        console.log('✅ Funcionalidad de upload inicializada');
+        // Global drag and drop handlers to show visual feedback
+        let dragCounter = 0;
+        const appContainer = document.querySelector('.app-container');
+        
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            if (appContainer) {
+                appContainer.classList.add('global-drag-over');
+            }
+        });
+        
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0 && appContainer) {
+                appContainer.classList.remove('global-drag-over');
+            }
+        });
+        
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            if (appContainer) {
+                appContainer.classList.remove('global-drag-over');
+            }
+            
+            // If dropped outside upload area, still handle the files
+            if (e.target !== uploadArea && !uploadArea.contains(e.target)) {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    this.handleFiles(files);
+                }
+            }
+        });
+        
+        console.log('✅ Funcionalidad de upload inicializada con drag & drop mejorado');
     }
     
     // Initialize document type slider
@@ -398,58 +420,105 @@ class CatastralAnalyzer {
         console.log(`🔄 Cambiado a tipo de documento: ${type}`);
     }
     
-    // Handle file upload
+    // Handle file upload - Enhanced with better user feedback
     async handleFiles(files) {
         if (!this.apiKey) {
-            this.showError('Por favor configura tu API Key primero');
+            this.showError('⚙️ Configuración requerida\n\nPor favor configura tu API Key de Google AI Studio primero para poder procesar documentos.\n\n🔗 Obtén tu clave en: https://makersuite.google.com/app/apikey');
             return;
         }
         
-        console.log(`📁 Procesando ${files.length} archivo(s)...`);
+        const fileArray = Array.from(files);
+        const validFiles = [];
+        const invalidFiles = [];
         
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
+        // Validate all files first
+        fileArray.forEach(file => {
+            if (this.validateFile(file)) {
+                validFiles.push(file);
+            } else {
+                invalidFiles.push(file);
+            }
+        });
+        
+        if (validFiles.length === 0) {
+            this.showError('❌ No hay archivos válidos para procesar.\n\n💡 Verifica que los archivos sean PDF o imágenes y no excedan 20MB.');
+            return;
+        }
+        
+        if (invalidFiles.length > 0) {
+            console.warn(`⚠️ Se omitieron ${invalidFiles.length} archivo(s) inválido(s)`);
+        }
+        
+        console.log(`📁 Procesando ${validFiles.length} archivo(s) válido(s)...`);
+        
+        // Show processing feedback
+        if (validFiles.length > 1) {
+            this.addChatMessage('system', `📤 Subiendo ${validFiles.length} archivos... Esto puede tomar unos momentos.`);
+        }
+        
+        for (let i = 0; i < validFiles.length; i++) {
+            const file = validFiles[i];
             
-            // Validate file
-            if (!this.validateFile(file)) continue;
-            
-            // Add file to UI
-            const fileItem = this.createFileItem(file);
-            this.addFileToList(fileItem);
-            
-            // Process file
             try {
-                fileItem.setStatus('processing', 'Procesando...');
+                // Add file to UI
+                const fileItem = this.createFileItem(file);
+                this.addFileToList(fileItem);
+                
+                // Process file
+                fileItem.setStatus('processing', `Procesando... (${i + 1}/${validFiles.length})`);
+                
                 const extractedData = await this.processFile(file);
                 
                 if (extractedData) {
-                    fileItem.setStatus('completed', 'Completado');
+                    fileItem.setStatus('completed', '✅ Completado');
                     this.displayExtractedData(extractedData);
                     
                     // Add success message to chat
-                    this.addChatMessage('system', `✅ Documento "${file.name}" procesado correctamente. Los datos han sido extraídos y están disponibles en la pestaña de Tablas.`);
+                    this.addChatMessage('system', `✅ Documento "${file.name}" procesado correctamente.\n\n📊 Los datos extraídos están disponibles en la pestaña de Tablas.\n💬 Puedes hacer preguntas sobre el contenido en este chat.`);
                 } else {
-                    fileItem.setStatus('error', 'Error en procesamiento');
+                    fileItem.setStatus('error', '❌ Sin datos extraídos');
+                    this.addChatMessage('system', `⚠️ El documento "${file.name}" fue procesado pero no se pudieron extraer datos estructurados.\n\n💡 Verifica que el documento contenga texto legible y datos catastrales.`);
                 }
             } catch (error) {
                 console.error('Error procesando archivo:', error);
-                fileItem.setStatus('error', error.message || 'Error desconocido');
-                this.showError(`Error procesando ${file.name}: ${error.message}`);
+                const fileItem = document.querySelector(`[data-file-name="${file.name}"]`);
+                if (fileItem && fileItem.setStatus) {
+                    fileItem.setStatus('error', '❌ Error');
+                }
+                this.showError(`💥 Error procesando "${file.name}":\n\n${error.message || 'Error desconocido'}\n\n💡 Intenta con otro archivo o verifica que el documento sea legible.`);
             }
+        }
+        
+        if (validFiles.length > 1) {
+            this.addChatMessage('system', `🎉 ¡Procesamiento completado!\n\n📊 Se procesaron ${validFiles.length} documentos.\n💬 Ahora puedes hacer preguntas sobre los datos extraídos.`);
         }
     }
     
-    // Validate file
+    // Validate file - Enhanced with user-friendly messages
     validateFile(file) {
         const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+        const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg'];
         
         if (!allowedTypes.includes(file.type)) {
-            this.showError(`Tipo de archivo no soportado: ${file.name}. Solo se permiten PDF e imágenes PNG/JPEG.`);
-            return false;
+            const fileName = file.name;
+            const fileExtension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+            
+            if (allowedExtensions.includes(fileExtension)) {
+                // File has correct extension but wrong MIME type, allow it
+                console.warn(`Archivo ${fileName} tiene MIME type incorrecto pero extensión válida, permitiendo...`);
+            } else {
+                this.showError(`❌ Tipo de archivo no soportado: "${file.name}"\n\n📄 Formatos permitidos:\n• PDF con texto\n• Imágenes PNG/JPEG\n\n💡 Tip: Convierte tu documento a PDF para mejores resultados.`);
+                return false;
+            }
         }
         
         if (file.size > this.maxSingleFile) {
-            this.showError(`Archivo demasiado grande: ${file.name}. Máximo ${this.formatFileSize(this.maxSingleFile)} por archivo.`);
+            this.showError(`📦 Archivo demasiado grande: "${file.name}"\n\n💾 Tamaño actual: ${this.formatFileSize(file.size)}\n📏 Tamaño máximo: ${this.formatFileSize(this.maxSingleFile)}\n\n💡 Tip: Comprime el archivo o divide el documento en secciones más pequeñas.`);
+            return false;
+        }
+        
+        if (file.size === 0) {
+            this.showError(`⚠️ El archivo "${file.name}" está vacío.\n\n💡 Por favor, verifica que el archivo contenga información.`);
             return false;
         }
         
@@ -463,6 +532,7 @@ class CatastralAnalyzer {
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item';
         fileItem.setAttribute('data-file-id', fileId);
+        fileItem.setAttribute('data-file-name', file.name);
         
         fileItem.innerHTML = `
             <div class="file-info">
@@ -474,7 +544,7 @@ class CatastralAnalyzer {
             </div>
             <div class="file-status">
                 <div class="status-indicator processing"></div>
-                <span class="status-text">Procesando...</span>
+                <span class="status-text">Preparando...</span>
             </div>
             <div class="file-progress">
                 <div class="progress-bar-partial"></div>
