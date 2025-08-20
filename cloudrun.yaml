@@ -26,10 +26,7 @@ spec:
         - containerPort: 8080
         env:
         - name: GEMINI_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: gemini-api-key
-              key: key
+          value: "$(GEMINI_API_KEY)"
         resources:
           limits:
             memory: "4Gi"

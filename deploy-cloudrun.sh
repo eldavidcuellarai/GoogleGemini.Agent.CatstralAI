@@ -40,5 +40,12 @@ gcloud run deploy $SERVICE_NAME \
 echo "✅ Deployment complete!"
 echo "🔗 Service URL: https://$SERVICE_NAME-$REGION.run.app"
 echo ""
-echo "⚠️  Don't forget to set your environment variable:"
-echo "gcloud run services update $SERVICE_NAME --update-env-vars GEMINI_API_KEY=your_api_key_here --region $REGION --project $PROJECT_ID"
+# Set environment variable from local .env file
+if [ -f .env ]; then
+    GEMINI_API_KEY=$(grep GEMINI_API_KEY .env | cut -d '=' -f2)
+    echo "🔑 Setting GEMINI_API_KEY environment variable..."
+    gcloud run services update $SERVICE_NAME --update-env-vars GEMINI_API_KEY="$GEMINI_API_KEY" --region $REGION --project $PROJECT_ID
+else
+    echo "⚠️  .env file not found. Set your environment variable manually:"
+    echo "gcloud run services update $SERVICE_NAME --update-env-vars GEMINI_API_KEY=your_api_key_here --region $REGION --project $PROJECT_ID"
+fi
