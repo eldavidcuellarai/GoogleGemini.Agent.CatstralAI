@@ -26,83 +26,13 @@
                 </div>
                 <div class="header-controls">
                     <div class="connection-status" id="connectionStatus">
-                        <span class="status-indicator offline"></span>
-                        <span class="status-text">Sin configurar</span>
+                        <span class="status-indicator online"></span>
+                        <span class="status-text">Listo</span>
                     </div>
                 </div>
             </div>
         </header>
 
-        <!-- Configuration Section -->
-        <section class="config-section">
-            <div class="config-container">
-                <h2>Configuración</h2>
-                <div class="config-form">
-                    <div class="config-header">
-                        <div class="config-icon">⚙️</div>
-                        <div>
-                            <p class="config-description">Configura tu API Key de Google AI Studio para comenzar</p>
-                            <a href="https://makersuite.google.com/app/apikey" target="_blank" class="config-link">Obtener API Key →</a>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="apiKey" class="form-label">
-                            <span>API Key de Gemini</span>
-                            <span class="label-required">*</span>
-                        </label>
-                        <div class="api-key-input">
-                            <input 
-                                type="password" 
-                                id="apiKey" 
-                                class="form-control" 
-                                placeholder="AIzaSy..."
-                                autocomplete="off"
-                                maxlength="39"
-                                pattern="AIza[A-Za-z0-9_\-]{35}"
-                            >
-                            <button type="button" id="toggleApiKey" class="btn btn--outline btn--sm">
-                                <span class="show-text">Mostrar</span>
-                                <span class="hide-text hidden">Ocultar</span>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="systemPrompt" class="form-label">
-                            <span>Instrucciones del Sistema</span>
-                            <span class="label-optional">opcional</span>
-                        </label>
-                        <textarea 
-                            id="systemPrompt" 
-                            class="form-control system-prompt-textarea" 
-                            rows="4"
-                            placeholder="Personaliza cómo debe comportarse el asistente..."
-                        >Eres un experto analista de documentos catastrales especializado en el análisis técnico y legal de propiedades. Analiza detalladamente cartas catastrales, extrae información específica como superficie, ubicación, linderos, valor catastral, coordenadas, y proporciona análisis comparativos cuando se presenten múltiples documentos. Identifica posibles inconsistencias y brinda recomendaciones. Responde en español de manera clara, estructurada y profesional.</textarea>
-                        <div class="form-hint">💡 El prompt predeterminado está optimizado para análisis catastral</div>
-                    </div>
-                    <div class="form-group">
-                        <label for="geminiModel" class="form-label">
-                            <span>Modelo Gemini</span>
-                        </label>
-                        <select id="geminiModel" class="form-control">
-                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                        </select>
-                        <div class="form-hint">Puedes elegir el modelo de IA. Si falla, se usará el modelo alternativo automáticamente.</div>
-                    </div>
-                    
-                    <button id="saveConfig" class="btn btn--primary">
-                        Guardar Configuración
-                    </button>
-                    
-                    <div id="configStatus" class="config-status hidden">
-                        <div class="status status--success">
-                            ✓ Configuración guardada correctamente
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
 
         <!-- Main Analysis Section -->
         <section class="analysis-section">

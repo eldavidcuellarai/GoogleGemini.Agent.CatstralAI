@@ -1,7 +1,7 @@
 class CatastralAnalyzer {
     constructor() {
         this.apiKey = '';
-        this.systemPrompt = '';
+        this.systemPrompt = 'Eres un experto analista de documentos catastrales especializado en el análisis técnico y legal de propiedades. Analiza detalladamente cartas catastrales, extrae información específica como superficie, ubicación, linderos, valor catastral, coordenadas, y proporciona análisis comparativos cuando se presenten múltiples documentos. Identifica posibles inconsistencias y brinda recomendaciones. Responde en español de manera clara, estructurada y profesional.';
         this.conversationHistory = [];
         this.maxSingleFile = Infinity; // Sin límite de tamaño por archivo
         this.currentDocumentType = 'propiedad';
@@ -26,18 +26,10 @@ class CatastralAnalyzer {
     }
     
     initializeElements() {
-    // Configuration elements
-    this.apiKeyInput = document.getElementById('apiKey');
-    this.systemPromptInput = document.getElementById('systemPrompt');
-    this.saveConfigBtn = document.getElementById('saveConfig');
-    this.configStatus = document.getElementById('configStatus');
-    this.toggleApiKeyBtn = document.getElementById('toggleApiKey');
-    this.themeToggle = document.getElementById('themeToggle');
-    this.geminiModelSelect = document.getElementById('geminiModel');
-    // File upload elements
-    this.selectFilesBtn = document.getElementById('selectFilesBtn');
-    this.fileInput = document.getElementById('fileInputCompact');
-    this.uploadArea = document.getElementById('uploadAreaCompact');
+        // File upload elements
+        this.selectFilesBtn = document.getElementById('selectFilesBtn');
+        this.fileInput = document.getElementById('fileInputCompact');
+        this.uploadArea = document.getElementById('uploadAreaCompact');
         
         // Chat elements
         this.chatInput = document.getElementById('chatInput');
@@ -53,36 +45,6 @@ class CatastralAnalyzer {
     }
     
     bindEvents() {
-        // Configuration events
-        if (this.saveConfigBtn) {
-            this.saveConfigBtn.addEventListener('click', () => this.saveConfiguration());
-        }
-
-        if (this.geminiModelSelect) {
-            this.geminiModelSelect.addEventListener('change', (e) => {
-                this.geminiModel = e.target.value;
-                localStorage.setItem('catastral-analyzer-gemini-model', this.geminiModel);
-            });
-        }
-        
-        if (this.toggleApiKeyBtn) {
-            this.toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility());
-        }
-        
-        if (this.themeToggle) {
-            this.themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
-        
-        // Upload events - Removed handleFileSelect and handleDrop since they're handled in initializeFileUpload()
-        
-        if (this.processFilesBtn) {
-            this.processFilesBtn.addEventListener('click', () => this.processFiles());
-        }
-        
-        if (this.clearFilesBtn) {
-            this.clearFilesBtn.addEventListener('click', () => this.clearFiles());
-        }
-        
         // Modal events
         if (this.closeExportModalBtn) {
             this.closeExportModalBtn.addEventListener('click', () => this.hideExportModal());
@@ -157,127 +119,31 @@ class CatastralAnalyzer {
     
     loadConfiguration() {
         try {
-            // Try to get API key from environment variable first
+            // Try to get API key from environment variable
             const envApiKey = this.getEnvironmentVariable('GEMINI_API_KEY') || this.getEnvironmentVariable('GOOGLE_GENERATIVE_AI_API_KEY');
             
             if (envApiKey) {
                 this.apiKey = envApiKey;
-                if (this.apiKeyInput) {
-                    this.apiKeyInput.value = '••••••••••••••••'; // Show masked value
-                    this.apiKeyInput.disabled = true;
-                }
-                console.log('Using API key from environment variable');
-                
-                // Load system prompt from localStorage or use default
-                const savedConfig = localStorage.getItem('catastral-analyzer-config');
-                if (savedConfig) {
-                    const config = JSON.parse(savedConfig);
-                    if (this.systemPromptInput) {
-                        this.systemPromptInput.value = config.systemPrompt || this.systemPromptInput.value;
-                        this.systemPrompt = config.systemPrompt || this.systemPromptInput.value;
-                    }
-                }
-
-                // Load Gemini model from localStorage or default
-                const savedModel = localStorage.getItem('catastral-analyzer-gemini-model');
-                if (this.geminiModelSelect && savedModel) {
-                    this.geminiModelSelect.value = savedModel;
-                    this.geminiModel = savedModel;
-                }
-                
-                this.enableInterface();
-                this.showConfigStatus(true, 'Configuración cargada desde variables de entorno');
-                return;
+                console.log('✅ Using API key from environment variable');
+            } else {
+                console.warn('⚠️ No GEMINI_API_KEY found in environment variables');
+                // For deployment, the API key should always be available from environment
+                // If not available, we'll still try to enable the interface
             }
             
-            // Fallback to localStorage configuration
-            const savedConfig = localStorage.getItem('catastral-analyzer-config');
-            if (savedConfig) {
-                const config = JSON.parse(savedConfig);
-                if (this.apiKeyInput) this.apiKeyInput.value = config.apiKey || '';
-                if (this.systemPromptInput) this.systemPromptInput.value = config.systemPrompt || this.systemPromptInput.value;
-                if (config.apiKey && config.systemPrompt) {
-                    this.apiKey = config.apiKey;
-                    this.systemPrompt = config.systemPrompt;
-                    this.enableInterface();
-                    this.showConfigStatus(true);
-                }
-                // Load theme preference
-                if (config.theme) {
-                    document.documentElement.setAttribute('data-color-scheme', config.theme);
-                    this.updateThemeButton(config.theme);
-                }
-            }
-            // Load Gemini model from localStorage or default
-            const savedModel = localStorage.getItem('catastral-analyzer-gemini-model');
-            if (this.geminiModelSelect && savedModel) {
-                this.geminiModelSelect.value = savedModel;
-                this.geminiModel = savedModel;
-            }
+            // Always enable the interface since configuration is no longer required from UI
+            this.enableInterface();
+            
         } catch (error) {
             console.warn('Error loading configuration:', error);
+            // Still enable interface even if there's an error
+            this.enableInterface();
         }
     }
     
+    // Configuration is no longer needed from UI - handled via environment variables
     saveConfiguration() {
-        if (!this.systemPromptInput) {
-            this.showError('Elementos de configuración no encontrados');
-            return;
-        }
-        
-        const systemPrompt = this.systemPromptInput.value.trim();
-        
-        // Check if API key is already loaded from environment
-        if (this.apiKeyInput && this.apiKeyInput.disabled && this.apiKey) {
-            // API key comes from environment, only save system prompt
-            this.systemPrompt = systemPrompt;
-            
-            // Save only system prompt to localStorage
-            try {
-                const currentTheme = document.documentElement.getAttribute('data-color-scheme') || 'light';
-                const existingConfig = JSON.parse(localStorage.getItem('catastral-analyzer-config') || '{}');
-                localStorage.setItem('catastral-analyzer-config', JSON.stringify({
-                    ...existingConfig,
-                    systemPrompt: systemPrompt,
-                    theme: currentTheme
-                }));
-            } catch (error) {
-                console.warn('Error saving configuration:', error);
-            }
-            
-            this.enableInterface();
-            this.showConfigStatus(true, '✓ System Prompt guardado (API Key desde variables de entorno)');
-            console.log('✅ System Prompt guardado con API Key desde entorno');
-            return;
-        }
-        
-        // Manual API key configuration
-        if (!this.apiKeyInput) {
-            this.showError('Elementos de configuración no encontrados');
-            return;
-        }
-        
-        const apiKey = this.apiKeyInput.value.trim();
-        
-        if (!apiKey) {
-            this.showError('Por favor ingresa tu API Key de Gemini o configúrala como variable de entorno');
-            return;
-        }
-        
-        this.apiKey = apiKey;
-        this.systemPrompt = systemPrompt;
-        
-        // Save to localStorage
-        const config = {
-            apiKey: this.apiKey,
-            systemPrompt: this.systemPrompt,
-            theme: document.documentElement.getAttribute('data-color-scheme') || 'light'
-        };
-        
-        localStorage.setItem('catastral-analyzer-config', JSON.stringify(config));
-        
-        this.enableInterface();
-        this.showConfigStatus(true);
+        console.log('Configuration is now handled via environment variables');
         
         console.log('✅ Configuración guardada');
     }
@@ -304,42 +170,9 @@ class CatastralAnalyzer {
         }
     }
     
-    showConfigStatus(success, message = '') {
-        if (!this.configStatus) return;
-        
-        this.configStatus.classList.remove('hidden');
-        const statusText = this.configStatus.querySelector('.status-text');
-        const statusIcon = this.configStatus.querySelector('.status-icon');
-        
-        if (success) {
-            if (statusText) statusText.textContent = message || 'Configuración guardada correctamente';
-            if (statusIcon) statusIcon.textContent = '✅';
-            this.configStatus.classList.add('success');
-            this.configStatus.classList.remove('error');
-        } else {
-            if (statusText) statusText.textContent = message || 'Error en la configuración';
-            if (statusIcon) statusIcon.textContent = '❌';
-            this.configStatus.classList.add('error');
-            this.configStatus.classList.remove('success');
-        }
-        
-        // Hide after 3 seconds
-        setTimeout(() => {
-            this.configStatus.classList.add('hidden');
-        }, 3000);
-    }
+    // Removed showConfigStatus - no longer needed without configuration UI
     
-    toggleApiKeyVisibility() {
-        if (!this.apiKeyInput || !this.toggleApiKeyBtn) return;
-        
-        const isPassword = this.apiKeyInput.type === 'password';
-        this.apiKeyInput.type = isPassword ? 'text' : 'password';
-        
-        const icon = this.toggleApiKeyBtn.querySelector('.show-text');
-        if (icon) {
-            icon.textContent = isPassword ? '🙈' : '👁️';
-        }
-    }
+    // Removed toggleApiKeyVisibility - no longer needed without configuration UI
     
     toggleTheme() {
         const currentTheme = document.documentElement.getAttribute('data-color-scheme') || 'light';
@@ -523,7 +356,7 @@ class CatastralAnalyzer {
     // Handle file upload - Enhanced with better user feedback
     async handleFiles(files) {
         if (!this.apiKey) {
-            this.showError('⚙️ Configuración requerida\n\nPor favor configura tu API Key de Google AI Studio primero para poder procesar documentos.\n\n🔗 Obtén tu clave en: https://makersuite.google.com/app/apikey');
+            this.showError('⚙️ API Key requerida\n\nNo se encontró la clave API de Gemini en las variables de entorno.\n\n🔗 Configura GEMINI_API_KEY en tu plataforma de despliegue.');
             return;
         }
         

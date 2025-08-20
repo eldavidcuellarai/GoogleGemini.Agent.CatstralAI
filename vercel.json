@@ -1,29 +1,6 @@
 {
-  "version": 2,
-  "public": false,
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/el cerebro de gemini/index.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "SAMEORIGIN"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        }
-      ]
-    }
-  ]
+  "buildCommand": "cd v0-registro-de-la-propiedad && pnpm install && pnpm build",
+  "outputDirectory": "v0-registro-de-la-propiedad/.next",
+  "installCommand": "cd v0-registro-de-la-propiedad && pnpm install",
+  "framework": "nextjs"
 }
