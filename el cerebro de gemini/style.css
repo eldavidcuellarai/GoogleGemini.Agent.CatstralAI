@@ -65,12 +65,12 @@
   --color-focus-ring: rgba(var(--color-teal-500-rgb), 0.4);
   --color-select-caret: rgba(var(--color-slate-900-rgb), 0.8);
   
-  /* Analysis Section Colors */
-  --color-tab-bg: #f8fafc;
-  --color-tab-active: #3b82f6;
-  --color-panel-bg: #ffffff;
-  --color-data-card-bg: #f9fafb;
-  --color-status-completed: #10b981;
+  /* Analysis Section Colors - Dark Mode Optimized */
+  --color-tab-bg: #1e293b;
+  --color-tab-active: #32a8e6;
+  --color-panel-bg: #1e293b;
+  --color-data-card-bg: #334155;
+  --color-status-completed: #32e6a8;
 
   /* Common style patterns */
   --focus-ring: 0 0 0 3px var(--color-focus-ring);
@@ -151,13 +151,13 @@
   --container-xl: 1280px;
 }
 
-/* Force Dark Mode as Default */
+/* Force Dark Mode as Default - Enhanced */
 :root {
   /* RGB versions for opacity control (Dark Mode) */
-  --color-gray-400-rgb: 119, 124, 124;
-  --color-teal-300-rgb: 50, 184, 198;
-  --color-gray-300-rgb: 167, 169, 169;
-  --color-gray-200-rgb: 245, 245, 245;
+  --color-gray-400-rgb: 148, 163, 184;
+  --color-teal-300-rgb: 94, 234, 212;
+  --color-gray-300-rgb: 203, 213, 225;
+  --color-gray-200-rgb: 241, 245, 249;
 
   /* Background color tokens (Dark Mode) */
   --color-bg-1: rgba(29, 78, 216, 0.15); /* Dark blue */
@@ -169,31 +169,31 @@
   --color-bg-7: rgba(190, 24, 93, 0.15); /* Dark pink */
   --color-bg-8: rgba(8, 145, 178, 0.15); /* Dark cyan */
   
-  /* Semantic Color Tokens (Dark Mode) */
-  --color-background: var(--color-charcoal-700);
-  --color-surface: var(--color-charcoal-800);
-  --color-text: var(--color-gray-200);
-  --color-text-secondary: rgba(var(--color-gray-300-rgb), 0.7);
-  --color-primary: var(--color-teal-300);
-  --color-primary-hover: var(--color-teal-400);
-  --color-primary-active: var(--color-teal-800);
-  --color-secondary: rgba(var(--color-gray-400-rgb), 0.15);
-  --color-secondary-hover: rgba(var(--color-gray-400-rgb), 0.25);
-  --color-secondary-active: rgba(var(--color-gray-400-rgb), 0.3);
-  --color-border: rgba(var(--color-gray-400-rgb), 0.3);
-  --color-error: var(--color-red-400);
-  --color-success: var(--color-teal-300);
-  --color-warning: var(--color-orange-400);
-  --color-info: var(--color-gray-300);
-  --color-focus-ring: rgba(var(--color-teal-300-rgb), 0.4);
-  --color-btn-primary-text: var(--color-slate-900);
-  --color-card-border: rgba(var(--color-gray-400-rgb), 0.2);
-  --color-card-border-inner: rgba(var(--color-gray-400-rgb), 0.15);
-  --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.15);
-  --button-border-secondary: rgba(var(--color-gray-400-rgb), 0.2);
-  --color-border-secondary: rgba(var(--color-gray-400-rgb), 0.2);
-  --color-select-caret: rgba(var(--color-gray-200-rgb), 0.8);
+  /* Semantic Color Tokens (Dark Mode Enhanced) */
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
+  --color-text: #f1f5f9;
+  --color-text-secondary: rgba(203, 213, 225, 0.8);
+  --color-primary: #5eead4;
+  --color-primary-hover: #2dd4bf;
+  --color-primary-active: #14b8a6;
+  --color-secondary: rgba(148, 163, 184, 0.15);
+  --color-secondary-hover: rgba(148, 163, 184, 0.25);
+  --color-secondary-active: rgba(148, 163, 184, 0.3);
+  --color-border: rgba(148, 163, 184, 0.3);
+  --color-error: #f87171;
+  --color-success: #5eead4;
+  --color-warning: #fbbf24;
+  --color-info: #cbd5e1;
+  --color-focus-ring: rgba(94, 234, 212, 0.4);
+  --color-btn-primary-text: #0f172a;
+  --color-card-border: rgba(148, 163, 184, 0.2);
+  --color-card-border-inner: rgba(148, 163, 184, 0.15);
+  --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  --button-border-secondary: rgba(148, 163, 184, 0.2);
+  --color-border-secondary: rgba(148, 163, 184, 0.2);
+  --color-select-caret: rgba(241, 245, 249, 0.9);
 
   /* Common style patterns - updated for dark mode */
   --focus-ring: 0 0 0 3px var(--color-focus-ring);
@@ -203,11 +203,11 @@
   --select-caret-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23134252' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   --select-caret-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f5f5f5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 
-  /* RGB versions for dark mode */
-  --color-success-rgb: var(--color-teal-300-rgb);
-  --color-error-rgb: var(--color-red-400-rgb);
-  --color-warning-rgb: var(--color-orange-400-rgb);
-  --color-info-rgb: var(--color-gray-300-rgb);
+  /* RGB versions for dark mode - Enhanced */
+  --color-success-rgb: 94, 234, 212;
+  --color-error-rgb: 248, 113, 113;
+  --color-warning-rgb: 251, 191, 36;
+  --color-info-rgb: 203, 213, 225;
 }
 
 /* Additional Dark Mode Styles */
@@ -2801,4 +2801,181 @@ input[name="docType"]#gravamenType:checked ~ .slider-indicator {
 .uploaded-files-list::-webkit-scrollbar-thumb:hover,
 .chat-messages::-webkit-scrollbar-thumb:hover {
   background: var(--color-text);
+}
+
+/* === OPTIMIZACIÓN COMPLETA MODO OSCURO === */
+
+/* Forzar estilos de modo oscuro en el body y html */
+html, body {
+  background-color: var(--color-background) !important;
+  color: var(--color-text) !important;
+}
+
+/* Asegurar que todos los inputs y textareas tengan el estilo oscuro */
+input, textarea, select {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--color-text-secondary) !important;
+}
+
+/* Optimizar botones para mejor contraste */
+.btn--primary {
+  background-color: var(--color-primary) !important;
+  color: var(--color-btn-primary-text) !important;
+  border-color: var(--color-primary) !important;
+}
+
+.btn--primary:hover {
+  background-color: var(--color-primary-hover) !important;
+  border-color: var(--color-primary-hover) !important;
+}
+
+.btn--outline {
+  background-color: transparent !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+
+.btn--outline:hover {
+  background-color: var(--color-secondary-hover) !important;
+  color: var(--color-text) !important;
+}
+
+/* Mejorar contraste en cards */
+.card {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-card-border) !important;
+  color: var(--color-text) !important;
+}
+
+/* Optimizar área de upload */
+.upload-area, .upload-area-compact {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+
+.upload-area:hover, .upload-area-compact:hover {
+  background-color: var(--color-secondary-hover) !important;
+  border-color: var(--color-primary) !important;
+}
+
+/* Mejorar tabs y paneles de análisis */
+.tab-button {
+  background-color: var(--color-tab-bg) !important;
+  color: var(--color-text-secondary) !important;
+  border-color: var(--color-border) !important;
+}
+
+.tab-button.active {
+  background-color: var(--color-surface) !important;
+  color: var(--color-primary) !important;
+  border-bottom-color: var(--color-primary) !important;
+}
+
+.tab-content {
+  background-color: var(--color-panel-bg) !important;
+  color: var(--color-text) !important;
+}
+
+/* Optimizar data cards */
+.data-card {
+  background-color: var(--color-data-card-bg) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* Mejorar chat messages */
+.message {
+  color: var(--color-text) !important;
+}
+
+.message.user {
+  background-color: var(--color-primary) !important;
+  color: var(--color-btn-primary-text) !important;
+}
+
+.message.assistant {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* Optimizar elementos de estado */
+.status-indicator.online {
+  background-color: var(--color-success) !important;
+}
+
+.status-indicator.offline {
+  background-color: var(--color-error) !important;
+}
+
+.status-text {
+  color: var(--color-text-secondary) !important;
+}
+
+/* Mejorar tooltips y modals */
+.tooltip, .modal {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* Optimizar headers y títulos */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-text) !important;
+}
+
+.header {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+}
+
+.header-subtitle {
+  color: var(--color-text-secondary) !important;
+}
+
+/* Mejorar enlaces */
+a {
+  color: var(--color-primary) !important;
+}
+
+a:hover {
+  color: var(--color-primary-hover) !important;
+}
+
+/* Optimizar progress bars */
+.progress-bar {
+  background-color: var(--color-surface) !important;
+}
+
+.progress-fill {
+  background-color: var(--color-primary) !important;
+}
+
+/* Asegurar contraste en listas y elementos de navegación */
+.list-item {
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+
+.list-item:hover {
+  background-color: var(--color-secondary-hover) !important;
+}
+
+/* Mejorar sombras para modo oscuro */
+.shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+.shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3) !important;
+}
+
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4) !important;
 }

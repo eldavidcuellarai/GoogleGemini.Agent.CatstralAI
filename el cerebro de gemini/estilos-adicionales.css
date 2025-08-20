@@ -1,14 +1,15 @@
-/* Estilos adicionales para la versión optimizada */
+/* Estilos adicionales para la versión optimizada - MODO OSCURO */
 
-/* Quick Start Info Section */
+/* Quick Start Info Section - Dark Mode */
 .quick-start-info {
     text-align: center;
     padding: 2rem 0;
+    background-color: var(--color-background);
 }
 
 .quick-start-description {
     font-size: 1.1rem;
-    color: var(--color-text-secondary);
+    color: var(--color-text-secondary) !important;
     margin-bottom: 2rem;
 }
 
@@ -20,18 +21,20 @@
 }
 
 .feature-card {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
+    background: var(--color-surface) !important;
+    border: 1px solid var(--color-border) !important;
     border-radius: var(--radius-md);
     padding: 1.5rem;
     text-align: center;
     transition: all var(--duration-normal) var(--ease-standard);
+    color: var(--color-text) !important;
 }
 
 .feature-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
-    border-color: var(--color-primary);
+    border-color: var(--color-primary) !important;
+    background: var(--color-secondary-hover) !important;
 }
 
 .feature-icon {
@@ -41,14 +44,14 @@
 }
 
 .feature-card h4 {
-    color: var(--color-text);
+    color: var(--color-text) !important;
     font-size: 1.25rem;
     font-weight: 600;
     margin: 0 0 0.5rem 0;
 }
 
 .feature-card p {
-    color: var(--color-text-secondary);
+    color: var(--color-text-secondary) !important;
     font-size: 0.95rem;
     margin: 0;
     line-height: 1.5;
@@ -62,13 +65,13 @@
 }
 
 .validation-info h3 {
-    color: var(--color-text);
+    color: var(--color-text) !important;
     margin-bottom: 1rem;
     font-size: 1.5rem;
 }
 
 .validation-info > p {
-    color: var(--color-text-secondary);
+    color: var(--color-text-secondary) !important;
     font-size: 1rem;
     line-height: 1.6;
     margin-bottom: 2rem;
@@ -84,16 +87,18 @@
     align-items: flex-start;
     gap: 1rem;
     padding: 1.5rem;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
+    background: var(--color-surface) !important;
+    border: 1px solid var(--color-border) !important;
     border-radius: var(--radius-md);
     transition: all var(--duration-normal) var(--ease-standard);
+    color: var(--color-text) !important;
 }
 
 .validation-feature:hover {
-    border-color: var(--color-primary);
+    border-color: var(--color-primary) !important;
     transform: translateY(-1px);
     box-shadow: var(--shadow-sm);
+    background: var(--color-secondary-hover) !important;
 }
 
 .validation-feature .feature-icon {
@@ -314,4 +319,79 @@
     .validation-feature .feature-icon {
         font-size: 1.5rem;
     }
+}
+
+/* === OPTIMIZACIÓN ADICIONAL MODO OSCURO === */
+
+/* Asegurar que todos los elementos tengan colores consistentes */
+* {
+    scrollbar-color: var(--color-border) var(--color-surface);
+}
+
+/* Optimizar elementos específicos para mejor contraste */
+.feature-icon {
+    color: var(--color-primary) !important;
+}
+
+.validation-feature-icon {
+    color: var(--color-primary) !important;
+}
+
+.validation-feature h4 {
+    color: var(--color-text) !important;
+}
+
+.validation-feature p {
+    color: var(--color-text-secondary) !important;
+}
+
+/* Mejorar elementos de retroalimentación visual */
+.success-message {
+    background-color: rgba(94, 234, 212, 0.1) !important;
+    border-color: var(--color-success) !important;
+    color: var(--color-success) !important;
+}
+
+.error-message {
+    background-color: rgba(248, 113, 113, 0.1) !important;
+    border-color: var(--color-error) !important;
+    color: var(--color-error) !important;
+}
+
+.warning-message {
+    background-color: rgba(251, 191, 36, 0.1) !important;
+    border-color: var(--color-warning) !important;
+    color: var(--color-warning) !important;
+}
+
+.info-message {
+    background-color: rgba(203, 213, 225, 0.1) !important;
+    border-color: var(--color-info) !important;
+    color: var(--color-info) !important;
+}
+
+/* Optimizar cualquier elemento que pueda tener fondo claro */
+div, section, article, aside, header, footer, nav, main {
+    background-color: inherit;
+    color: inherit;
+}
+
+/* Asegurar que los códigos y elementos pre tengan buen contraste */
+code, pre {
+    background-color: var(--color-surface) !important;
+    color: var(--color-text) !important;
+    border: 1px solid var(--color-border) !important;
+}
+
+/* Optimizar elementos de formulario adicionales */
+fieldset {
+    border-color: var(--color-border) !important;
+}
+
+legend {
+    color: var(--color-text) !important;
+}
+
+label {
+    color: var(--color-text) !important;
 }
