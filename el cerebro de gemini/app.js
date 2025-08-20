@@ -811,66 +811,57 @@ ${extractionFields}`;
 }`;
     }
     
-    // Call Gemini API
+    // Call Gemini API through serverless function
     async callGeminiAPI(prompt, content, fileType) {
         let model = this.geminiModel || 'gemini-2.5-pro';
-        let url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
-        let parts;
+        let textContent;
         
         if (fileType === 'application/pdf') {
             // For PDF with text, send as text
-            parts = [
-                { text: prompt },
-                { text: `\n\nCONTENIDO DEL DOCUMENTO:\n${content}` }
-            ];
+            textContent = `${prompt}\n\nCONTENIDO DEL DOCUMENTO:\n${content}`;
         } else if (fileType === 'application/pdf-scanned') {
-            // For scanned PDF, send as PDF document for vision processing
-            parts = [
-                { text: prompt },
-                { 
-                    inlineData: {
-                        mimeType: 'application/pdf',
-                        data: content
-                    }
-                }
-            ];
+            // For scanned PDF, note that this needs to be handled differently
+            // For now, we'll treat it as text content
+            textContent = `${prompt}\n\nDocumento PDF escaneado - contenido extraído:\n${content}`;
         } else {
-            // For images, send as multimodal
-            parts = [
-                { text: prompt },
-                { 
-                    inlineData: {
-                        mimeType: fileType,
-                        data: content
-                    }
-                }
-            ];
+            // For images, convert to text description first or handle differently
+            textContent = `${prompt}\n\nContenido del archivo: ${content}`;
         }
+
         const requestBody = {
-            contents: [{ parts: parts }]
+            text: textContent,
+            model: model,
+            systemPrompt: this.systemPrompt
         };
+
         try {
-            let response = await fetch(url, {
+            let response = await fetch('/api/gemini', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
+
             if (!response.ok) {
                 // Fallback to alternate model if available
                 if (model !== this.geminiFallbackModel) {
-                    model = this.geminiFallbackModel;
-                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
-                    response = await fetch(url, {
+                    const fallbackRequestBody = {
+                        ...requestBody,
+                        model: this.geminiFallbackModel
+                    };
+                    
+                    response = await fetch('/api/gemini', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(requestBody)
+                        body: JSON.stringify(fallbackRequestBody)
                     });
                 }
+                
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+                    throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
                 }
             }
+
             const data = await response.json();
             if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
                 throw new Error('Respuesta inválida de la API de Gemini');
@@ -1440,10 +1431,9 @@ ${extractionFields}`;
         }
     }
     
-    // Call chat with Gemini - Fixed version
+    // Call chat with Gemini through serverless function
     async callChatWithGemini(message) {
         let model = this.geminiModel || 'gemini-2.5-pro';
-        let url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
         
         let contextPrompt = `Eres un experto analista de documentos catastrales y notariales mexicanos. Tu función es:
 
@@ -1468,59 +1458,29 @@ IMPORTANTE:
             contextPrompt += `\n\nActualmente no hay datos extraídos disponibles. El usuario puede estar preguntando sobre el proceso de extracción o documentos en general.`;
         }
         
-        // Build conversation history for better context
-        const conversationParts = [];
-        
-        // Add system context and user message combined
-        const systemAndUserMessage = `${contextPrompt}\n\nPregunta del usuario: ${message}`;
-        
-        conversationParts.push({
-            role: "user",
-            parts: [{ text: systemAndUserMessage }]
-        });
-        
-        // Add recent conversation history (last 10 messages) with correct roles
-        const recentHistory = this.conversationHistory.slice(-10);
-        recentHistory.forEach(entry => {
-            conversationParts.push({
-                role: entry.role === 'user' ? 'user' : 'model',
-                parts: [{ text: entry.content }]
+        // Build conversation context
+        let conversationContext = '';
+        if (this.conversationHistory.length > 0) {
+            const recentHistory = this.conversationHistory.slice(-10);
+            conversationContext = '\n\nHISTORIAL DE CONVERSACIÓN RECIENTE:\n';
+            recentHistory.forEach(entry => {
+                conversationContext += `${entry.role}: ${entry.content}\n`;
             });
-        });
+        }
+        
+        // Combine everything into a single text prompt
+        const fullPrompt = `${contextPrompt}${conversationContext}\n\nPregunta del usuario: ${message}`;
         
         const requestBody = {
-            contents: conversationParts,
-            generationConfig: {
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 2048
-            },
-            safetySettings: [
-                {
-                    category: "HARM_CATEGORY_HARASSMENT",
-                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
-                },
-                {
-                    category: "HARM_CATEGORY_HATE_SPEECH",
-                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
-                },
-                {
-                    category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
-                },
-                {
-                    category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
-                }
-            ]
+            text: fullPrompt,
+            model: model,
+            systemPrompt: contextPrompt
         };
         
         try {
-            console.log('Sending chat request to:', url);
-            console.log('Request body:', JSON.stringify(requestBody, null, 2));
+            console.log('Sending chat request to /api/gemini');
             
-            let response = await fetch(url, {
+            let response = await fetch('/api/gemini', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1532,37 +1492,28 @@ IMPORTANTE:
                 // Fallback to alternate model if available
                 if (model !== this.geminiFallbackModel) {
                     console.log(`Chat: Trying fallback model ${this.geminiFallbackModel}`);
-                    model = this.geminiFallbackModel;
-                    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
-                    response = await fetch(url, {
+                    const fallbackRequestBody = {
+                        ...requestBody,
+                        model: this.geminiFallbackModel
+                    };
+                    
+                    response = await fetch('/api/gemini', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify(requestBody)
+                        body: JSON.stringify(fallbackRequestBody)
                     });
                 }
                 
                 if (!response.ok) {
-                    const responseText = await response.text();
-                    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-                    try {
-                        const errorData = JSON.parse(responseText);
-                        if (errorData.error && errorData.error.message) {
-                            errorMessage += ` - ${errorData.error.message}`;
-                        }
-                    } catch (e) {
-                        errorMessage += ` - ${responseText}`;
-                    }
-                    throw new Error(errorMessage);
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
                 }
             }
             
-            const responseText = await response.text();
-            console.log('Response status:', response.status);
+            const data = await response.json();
             console.log('Chat using model:', model);
-            
-            const data = JSON.parse(responseText);
             
             if (!data.candidates || data.candidates.length === 0) {
                 throw new Error('No se generó respuesta válida de la API');
