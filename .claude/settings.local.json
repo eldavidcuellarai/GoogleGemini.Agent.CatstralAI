@@ -10,7 +10,9 @@
       "Bash(pnpm dev:*)",
       "Bash(pnpm add:*)",
       "Bash(gh auth:*)",
-      "Bash(xcopy:*)"
+      "Bash(xcopy:*)",
+      "Bash(rm:*)",
+      "Bash(npm install)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

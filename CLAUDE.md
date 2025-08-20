@@ -1,56 +1,55 @@
 # Claude Instructions for GoogleGemini.Agent.CatstralAI
 
 ## Project Overview
-This is a catastral property registry analyzer using Google Gemini AI. The project consists of two main components:
-1. A simple HTML/JS interface (`el cerebro de gemini/`)
-2. A Next.js application for PDF property document processing (`v0-registro-de-la-propiedad/`)
-
-**Note**: The v0-registro-de-la-propiedad directory is now integrated as a regular folder (no longer a git submodule).
+This is a catastral property registry analyzer using Google Gemini AI. The project is a web application built with vanilla HTML, CSS, and JavaScript that provides intelligent document analysis for catastral properties.
 
 ## Project Structure
-- **Main directory**: Contains basic HTML interface and this project's core files
-- **v0-registro-de-la-propiedad/**: Next.js application for property registry document processing
-  - Built with Next.js 15, React 19, TypeScript
-  - Uses Tailwind CSS for styling with Radix UI components
+- **Main directory**: Contains the core application files and configuration
+- **el cerebro de gemini/**: Main web application for property document analysis
+  - HTML/CSS/JS frontend for document upload and analysis
   - PDF processing with pdfjs-dist
-  - AI integration using @ai-sdk packages
-  - Fully integrated into main project (no submodule)
+  - Direct integration with Google Gemini AI
+  - Real-time chat interface for document queries
+- **api/**: Serverless functions for Vercel deployment
+  - `gemini.js`: Secure API endpoint for Gemini AI calls
 
 ## Development Commands
-When working on the Next.js application (v0-registro-de-la-propiedad/):
-- **Development server**: `pnpm dev` or `npm run dev`
-- **Build**: `pnpm build` or `npm run build`
-- **Linting**: `pnpm lint` or `npm run lint`
-- **Production**: `pnpm start` or `npm run start`
+- **Local Development**: `npm run dev` or `node server.js`
+- **Production Build**: Files are served statically, no build step required
+- **Deploy to Vercel**: Use `vercel` CLI or GitHub integration
 
 ## Key Technologies
-- **Frontend**: Next.js 15, React 19, TypeScript
-- **Styling**: Tailwind CSS, Radix UI components
-- **PDF Processing**: pdfjs-dist
-- **AI/ML**: @ai-sdk/openai, @ai-sdk/gateway
-- **Forms**: react-hook-form with Zod validation
-- **Package Manager**: pnpm (based on lock file)
+- **Frontend**: Vanilla HTML5, CSS3, JavaScript (ES6+)
+- **PDF Processing**: PDF.js library for text extraction
+- **AI Integration**: Google Gemini AI API (gemini-2.5-pro, gemini-2.5-flash)
+- **Deployment**: Vercel with serverless functions
+- **Security**: Environment variables for API keys
 
 ## Important Notes
-- Always run commands from the `v0-registro-de-la-propiedad/` directory for the main application
-- Use `pnpm` as the package manager (pnpm-lock.yaml present)
-- The project handles PDF document analysis for property registry documents
-- AI integration is set up for document text extraction and analysis
-- Follow existing TypeScript and React patterns when making changes
-- The project is now optimized for Vercel deployment with proper configuration files
+- Application is optimized for Vercel deployment with serverless architecture
+- API key is handled securely through environment variables (GEMINI_API_KEY)
+- The project uses a serverless function (/api/gemini) for secure AI API calls
+- PDF documents are processed client-side with server-side AI analysis
+- Supports both property documents and mortgage documents (gravamen)
+- Responsive design with dark/light mode support
 
 ## Deployment
-- **Vercel**: Ready for deployment with vercel.json configuration
-- **Environment Variables**: Set GEMINI_API_KEY in Vercel dashboard
-- **Build Command**: Automatically handled by vercel.json
-- **Framework**: Auto-detected as Next.js
+- **Platform**: Vercel (optimized configuration)
+- **Environment Variables**: 
+  - Required: `GEMINI_API_KEY`
+  - Optional: `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`
+- **Configuration**: `vercel.json` with proper routing and security headers
+- **API**: Serverless function handles Gemini API calls securely
 
-## Testing
-- Run `pnpm lint` to check code quality
-- Build the project with `pnpm build` to verify TypeScript compilation
+## File Structure
+- **Frontend**: `el cerebro de gemini/index.html`, `app.js`, `style.css`
+- **API**: `api/gemini.js` (serverless function)
+- **Config**: `vercel.json`, `.env.example`
+- **Documentation**: `DEPLOYMENT.md` for deployment guide
 
-## File Locations
-- Main app logic: `v0-registro-de-la-propiedad/app/`
-- Components: `v0-registro-de-la-propiedad/components/`
-- Utilities: `v0-registro-de-la-propiedad/lib/` and `v0-registro-de-la-propiedad/utils/`
-- Types: `v0-registro-de-la-propiedad/lib/types.ts`
+## Development Workflow
+1. Modify files in `el cerebro de gemini/` for frontend changes
+2. Update `api/gemini.js` for backend API changes
+3. Test locally with `npm run dev`
+4. Deploy to Vercel with proper environment variables
+5. No build step required - static files are served directly
